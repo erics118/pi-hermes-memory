@@ -4,13 +4,13 @@ set -euo pipefail
 PASS=0
 
 TEST_TIMEOUT="${TEST_TIMEOUT:-120}"
-if [[ ! "$TEST_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+if [[ ! $TEST_TIMEOUT =~ ^[0-9]+([.][0-9]+)?$ ]]; then
   echo "Invalid TEST_TIMEOUT: $TEST_TIMEOUT (expected a non-negative number of seconds)" >&2
   exit 2
 fi
 
 TIMEOUT_BIN=()
-if [[ ! "$TEST_TIMEOUT" =~ ^0+([.]0+)?$ ]]; then
+if [[ ! $TEST_TIMEOUT =~ ^0+([.]0+)?$ ]]; then
   if command -v timeout >/dev/null 2>&1; then
     TIMEOUT_BIN=(timeout)
   elif command -v gtimeout >/dev/null 2>&1; then
@@ -33,7 +33,7 @@ for f in $(find tests -name '*.test.ts' | sort); do
     PASS=$((PASS + 1))
   else
     rc=$?
-    if [[ "$rc" -eq 124 && ${#TIMEOUT_BIN[@]} -gt 0 ]]; then
+    if [[ $rc -eq 124 && ${#TIMEOUT_BIN[@]} -gt 0 ]]; then
       echo "TIMEOUT (>${TEST_TIMEOUT}s): $f"
     else
       echo "FAILED (exit $rc): $f"

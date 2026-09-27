@@ -4,7 +4,8 @@
 
 import type { ModelThinkingLevel, TextContent } from "@earendil-works/pi-ai";
 
-export type MemoryOverflowStrategy = "auto-consolidate" | "reject" | "fifo-evict";
+export type MemoryOverflowStrategy =
+  "auto-consolidate" | "reject" | "fifo-evict";
 
 export type SessionSearchVariant = "legacy" | "anchors";
 
@@ -51,7 +52,7 @@ export interface MemoryConfig {
   /** Ceiling for the compact-path flush (direct + subprocess). Default: 60000 */
   flushCompactTimeoutMs?: number;
 
-  /** Override extension storage directory. Default: ~/.pi/agent/pi-hermes-memory */
+  /** Override extension storage directory. Default: ~/.pi/agent/pi-eric-memory */
   memoryDir?: string;
   /** Directory for project-scoped memory (relative to ~/.pi/agent). Default: "projects-memory" */
   projectsMemoryDir?: string;
@@ -221,7 +222,10 @@ export function getMessageText(msg: unknown, maxLength = 500): string | null {
   }
   if (Array.isArray(content)) {
     const text = (content as TextContent[])
-      .filter((block): block is TextContent => block.type === "text" && typeof block.text === "string")
+      .filter(
+        (block): block is TextContent =>
+          block.type === "text" && typeof block.text === "string",
+      )
       .map((block) => block.text)
       .join("\n");
     return text.length > 0 ? text.slice(0, maxLength) : null;

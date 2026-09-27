@@ -19,7 +19,12 @@ import {
   today,
   tokenizeForSimilarity,
 } from "./skill-utils.js";
-import type { SkillDocument, SkillIndex, SkillResult, SkillScope } from "../types.js";
+import type {
+  SkillDocument,
+  SkillIndex,
+  SkillResult,
+  SkillScope,
+} from "../types.js";
 import { AGENT_ROOT } from "../paths.js";
 
 interface SkillStoreOptions {
@@ -75,11 +80,16 @@ function formatPatchList(section: string, items: string[]): string {
   if (cleaned.length === 0) return "";
   const key = section.trim().toLowerCase();
   if (key === "pitfalls") {
-    return cleaned.map((item) => `- ${item.replace(/^[-*]\s+/, "")}`).join("\n");
+    return cleaned
+      .map((item) => `- ${item.replace(/^[-*]\s+/, "")}`)
+      .join("\n");
   }
   // Procedure / Verification default to ordered steps.
   return cleaned
-    .map((item, index) => `${index + 1}. ${item.replace(/^\d+\.\s+/, "").replace(/^[-*]\s+/, "")}`)
+    .map(
+      (item, index) =>
+        `${index + 1}. ${item.replace(/^\d+\.\s+/, "").replace(/^[-*]\s+/, "")}`,
+    )
     .join("\n");
 }
 
@@ -100,13 +110,15 @@ export function normalizeSkillPatchContent(
   let content = typeof rawContent === "string" ? rawContent.trim() : "";
   if (!content) {
     return {
-      error: "New content is required for patch. Prefer structured fields (procedure_steps, pitfalls, verification_steps, when_to_use) over free-form content.",
+      error:
+        "New content is required for patch. Prefer structured fields (procedure_steps, pitfalls, verification_steps, when_to_use) over free-form content.",
     };
   }
 
   if (looksLikeJsonObject(content)) {
     return {
-      error: "Patch content looks like a JSON object. Provide Markdown section body or a string array via structured fields.",
+      error:
+        "Patch content looks like a JSON object. Provide Markdown section body or a string array via structured fields.",
     };
   }
 
@@ -114,14 +126,18 @@ export function normalizeSkillPatchContent(
     try {
       const parsed: unknown = JSON.parse(content);
       if (!Array.isArray(parsed)) {
-        return { error: "Patch content looks like JSON but is not a string array." };
+        return {
+          error: "Patch content looks like JSON but is not a string array.",
+        };
       }
       const items = parsed
         .filter((item): item is string => typeof item === "string")
         .map((item) => item.trim())
         .filter(Boolean);
       if (items.length === 0) {
-        return { error: "Patch content JSON array must contain non-empty strings." };
+        return {
+          error: "Patch content JSON array must contain non-empty strings.",
+        };
       }
       const key = sectionName.toLowerCase();
       if (key === "when to use") {
@@ -133,7 +149,8 @@ export function normalizeSkillPatchContent(
       }
     } catch {
       return {
-        error: "Patch content looks like a JSON array but could not be parsed. Use Markdown or structured string[] fields.",
+        error:
+          "Patch content looks like a JSON array but could not be parsed. Use Markdown or structured string[] fields.",
       };
     }
   }
@@ -141,7 +158,8 @@ export function normalizeSkillPatchContent(
   // Reject payloads that would inject extra ## sections mid-body.
   if (/^#{1,6}\s+\S/m.test(content)) {
     return {
-      error: "Patch content must not include Markdown section headers (## ...). Patch only the body of the target section.",
+      error:
+        "Patch content must not include Markdown section headers (## ...). Patch only the body of the target section.",
     };
   }
 
@@ -151,7 +169,6 @@ export function normalizeSkillPatchContent(
 
   return { content: content.trim() };
 }
-
 
 export class SkillStore {
   private globalSkillsDir: string;
@@ -163,13 +180,23 @@ export class SkillStore {
 
   constructor(options: SkillStoreOptions = {}) {
     const agentRoot = AGENT_ROOT;
-    this.globalSkillsDir = options.globalSkillsDir ?? path.join(agentRoot, "pi-hermes-memory", "skills");
-    this.piGlobalSkillsDir = options.piGlobalSkillsDir ?? path.join(agentRoot, "skills");
+    this.globalSkillsDir =
+      options.globalSkillsDir ??
+      path.join(agentRoot, "pi-eric-memory", "skills");
+    this.piGlobalSkillsDir =
+      options.piGlobalSkillsDir ?? path.join(agentRoot, "skills");
     this.projectSkillsDir = options.projectSkillsDir ?? null;
     this.projectName = options.projectName ?? null;
-    this.legacySkillsDir = options.legacySkillsDir ?? path.join(agentRoot, "memory", "skills");
-    this.migrationSentinelPath = options.migrationSentinelPath
-      ?? path.join(agentRoot, "pi-hermes-memory", ".skills-migrated-to-extension-storage");
+    this.legacySkillsDir =
+      options.legacySkillsDir ??
+      path.join(agentRoot, "pi-hermes-memory", "skills");
+    this.migrationSentinelPath =
+      options.migrationSentinelPath ??
+      path.join(
+        agentRoot,
+        "pi-eric-memory",
+        ".skills-migrated-to-extension-storage",
+      );
   }
 
   getGlobalSkillsDir(): string {
@@ -193,7 +220,10 @@ export class SkillStore {
     return this.projectName;
   }
 
-  setProjectContext(projectName: string | null, projectSkillsDir: string | null): void {
+  setProjectContext(
+    projectName: string | null,
+    projectSkillsDir: string | null,
+  ): void {
     this.projectName = projectName;
     this.projectSkillsDir = projectSkillsDir;
   }
@@ -206,7 +236,11 @@ export class SkillStore {
   }
 
   async migrateLegacySkills(): Promise<LegacySkillMigrationResult> {
-    const result: LegacySkillMigrationResult = { migrated: 0, skipped: 0, warnings: [] };
+    const result: LegacySkillMigrationResult = {
+      migrated: 0,
+      skipped: 0,
+      warnings: [],
+    };
 
     // Always normalize flat markdown files under the global skills root,
     // even when a previous migration sentinel already exists.
@@ -214,7 +248,9 @@ export class SkillStore {
 
     if (await exists(this.migrationSentinelPath)) return result;
 
-    await fs.mkdir(path.dirname(this.migrationSentinelPath), { recursive: true });
+    await fs.mkdir(path.dirname(this.migrationSentinelPath), {
+      recursive: true,
+    });
 
     // Only this migration's own warnings may hold back its sentinel — a
     // permanently shadowed skill reported above must not make it retry forever.
@@ -223,15 +259,21 @@ export class SkillStore {
       await this.migrateLegacyMarkdownSkills(result);
     } finally {
       if (result.warnings.length === warningsBefore) {
-        await fs.writeFile(this.migrationSentinelPath, `${new Date().toISOString()}\n`, "utf-8");
+        await fs.writeFile(
+          this.migrationSentinelPath,
+          `${new Date().toISOString()}\n`,
+          "utf-8",
+        );
       }
     }
 
     return result;
   }
 
-  private async migrateLegacyMarkdownSkills(result: LegacySkillMigrationResult): Promise<void> {
-    if (!await exists(this.legacySkillsDir)) return;
+  private async migrateLegacyMarkdownSkills(
+    result: LegacySkillMigrationResult,
+  ): Promise<void> {
+    if (!(await exists(this.legacySkillsDir))) return;
 
     const files = (await fs.readdir(this.legacySkillsDir))
       .filter((file) => file.endsWith(".md"))
@@ -257,8 +299,12 @@ export class SkillStore {
 
         const skillDoc = {
           name: slug,
-          displayName: parsed.meta.display_name?.trim() || parsed.meta.name?.trim() || undefined,
-          description: parsed.meta.description?.trim() || `Migrated legacy skill: ${slug}`,
+          displayName:
+            parsed.meta.display_name?.trim() ||
+            parsed.meta.name?.trim() ||
+            undefined,
+          description:
+            parsed.meta.description?.trim() || `Migrated legacy skill: ${slug}`,
           version: Number.parseInt(parsed.meta.version || "1", 10) || 1,
           created: parsed.meta.created || today(),
           updated: parsed.meta.updated || today(),
@@ -269,13 +315,17 @@ export class SkillStore {
         await this.atomicWrite(targetPath, formatFrontmatter(skillDoc));
         result.migrated++;
       } catch (error) {
-        result.warnings.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+        result.warnings.push(
+          `${file}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }
 
-  private async migrateFlatMarkdownInGlobalSkillsDir(result: LegacySkillMigrationResult): Promise<void> {
-    if (!await exists(this.globalSkillsDir)) return;
+  private async migrateFlatMarkdownInGlobalSkillsDir(
+    result: LegacySkillMigrationResult,
+  ): Promise<void> {
+    if (!(await exists(this.globalSkillsDir))) return;
 
     const files = (await fs.readdir(this.globalSkillsDir))
       .filter((file) => file.endsWith(".md") && file !== "SKILL.md")
@@ -302,8 +352,12 @@ export class SkillStore {
 
         const skillDoc = {
           name: slug,
-          displayName: parsed.meta.display_name?.trim() || parsed.meta.name?.trim() || undefined,
-          description: parsed.meta.description?.trim() || `Migrated legacy skill: ${slug}`,
+          displayName:
+            parsed.meta.display_name?.trim() ||
+            parsed.meta.name?.trim() ||
+            undefined,
+          description:
+            parsed.meta.description?.trim() || `Migrated legacy skill: ${slug}`,
           version: Number.parseInt(parsed.meta.version || "1", 10) || 1,
           created: parsed.meta.created || today(),
           updated: parsed.meta.updated || today(),
@@ -315,7 +369,9 @@ export class SkillStore {
         await fs.rm(legacyPath, { force: true });
         result.migrated++;
       } catch (error) {
-        result.warnings.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+        result.warnings.push(
+          `${file}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }
@@ -333,10 +389,16 @@ export class SkillStore {
    * shadowed state impossible to create rather than merely reported after the
    * fact. Returns the shadowing path, or null when the name is free.
    */
-  private async findShadowingPiGlobalSkill(slug: string): Promise<string | null> {
-    if (path.resolve(this.piGlobalSkillsDir) === path.resolve(this.globalSkillsDir)) return null;
+  private async findShadowingPiGlobalSkill(
+    slug: string,
+  ): Promise<string | null> {
+    if (
+      path.resolve(this.piGlobalSkillsDir) ===
+      path.resolve(this.globalSkillsDir)
+    )
+      return null;
     const candidate = path.join(this.piGlobalSkillsDir, slug, "SKILL.md");
-    return await exists(candidate) ? candidate : null;
+    return (await exists(candidate)) ? candidate : null;
   }
 
   async loadIndex(scope?: SkillScope): Promise<SkillIndex[]> {
@@ -362,25 +424,35 @@ export class SkillStore {
     return this.readLocation(location);
   }
 
-  async create(name: string, description: string, body: string, scope?: SkillScope): Promise<SkillResult> {
+  async create(
+    name: string,
+    description: string,
+    body: string,
+    scope?: SkillScope,
+  ): Promise<SkillResult> {
     name = name.trim();
     description = description.trim();
     body = body.trim();
 
     if (!name) return { success: false, error: "Skill name is required." };
-    if (!description) return { success: false, error: "Skill description is required." };
+    if (!description)
+      return { success: false, error: "Skill description is required." };
     if (!body) return { success: false, error: "Skill body is required." };
 
     const scanError = scanContent(`${name} ${description} ${body}`);
     if (scanError) return { success: false, error: scanError };
 
     const slug = slugify(name);
-    if (!slug) return { success: false, error: "Skill name produces empty slug." };
+    if (!slug)
+      return { success: false, error: "Skill name produces empty slug." };
 
     const resolvedScope = this.resolveScope(scope, name, description, body);
     const root = this.getScopeRoot(resolvedScope);
     if (!root) {
-      return { success: false, error: "Project skills require an active project." };
+      return {
+        success: false,
+        error: "Project skills require an active project.",
+      };
     }
 
     const skillId = buildSkillId(resolvedScope, slug, this.projectName);
@@ -396,7 +468,10 @@ export class SkillStore {
     }
 
     if (resolvedScope === "global") {
-      const similarSkillIds = await this.findSimilarGlobalSkillIds(slug, description);
+      const similarSkillIds = await this.findSimilarGlobalSkillIds(
+        slug,
+        description,
+      );
       if (similarSkillIds.length > 0) {
         const targetId = similarSkillIds[0];
         return {
@@ -408,7 +483,10 @@ export class SkillStore {
         };
       }
 
-      const collidingNameSkillIds = await this.findNameCollisionGlobalSkillIds(slug, description);
+      const collidingNameSkillIds = await this.findNameCollisionGlobalSkillIds(
+        slug,
+        description,
+      );
       if (collidingNameSkillIds.length > 0) {
         const targetId = collidingNameSkillIds[0];
         return {
@@ -424,10 +502,11 @@ export class SkillStore {
       if (shadowedBy) {
         return {
           success: false,
-          error: `Pi already loads a global skill named '${slug}' from ${shadowedBy}. `
-            + `Pi keys skills by name and loads its own root first, so a skill written to `
-            + `${path.join(this.globalSkillsDir, slug, "SKILL.md")} would never be the copy in effect. `
-            + `Choose a different name, or edit ${shadowedBy} directly.`,
+          error:
+            `Pi already loads a global skill named '${slug}' from ${shadowedBy}. ` +
+            `Pi keys skills by name and loads its own root first, so a skill written to ` +
+            `${path.join(this.globalSkillsDir, slug, "SKILL.md")} would never be the copy in effect. ` +
+            `Choose a different name, or edit ${shadowedBy} directly.`,
           conflictType: "name-collision",
           suggestedAction: "rename",
         };
@@ -440,15 +519,18 @@ export class SkillStore {
     const displayName = name;
     const storedName = slug;
     const stamp = today();
-    await this.atomicWrite(filePath, formatFrontmatter({
-      name: storedName,
-      displayName,
-      description,
-      version: 1,
-      created: stamp,
-      updated: stamp,
-      body,
-    }));
+    await this.atomicWrite(
+      filePath,
+      formatFrontmatter({
+        name: storedName,
+        displayName,
+        description,
+        version: 1,
+        created: stamp,
+        updated: stamp,
+        body,
+      }),
+    );
 
     return {
       success: true,
@@ -460,12 +542,18 @@ export class SkillStore {
     };
   }
 
-  async patch(skillId: string, section: string, newContent: string): Promise<SkillResult> {
+  async patch(
+    skillId: string,
+    section: string,
+    newContent: string,
+  ): Promise<SkillResult> {
     const sectionName = normalizeSectionName(section);
-    if (!sectionName) return { success: false, error: "section is required for patch." };
+    if (!sectionName)
+      return { success: false, error: "section is required for patch." };
 
     const normalized = normalizeSkillPatchContent(sectionName, newContent);
-    if ("error" in normalized) return { success: false, error: normalized.error };
+    if ("error" in normalized)
+      return { success: false, error: normalized.error };
     const content = normalized.content;
 
     const scanError = scanContent(content);
@@ -496,22 +584,26 @@ export class SkillStore {
     }
 
     if (!found) {
-      if (result.length > 0 && result[result.length - 1] !== "") result.push("");
+      if (result.length > 0 && result[result.length - 1] !== "")
+        result.push("");
       result.push(sectionHeader);
       for (const bodyLine of content.split("\n")) {
         result.push(bodyLine);
       }
     }
 
-    await this.atomicWrite(doc.path, formatFrontmatter({
-      name: doc.name,
-      displayName: doc.displayName,
-      description: doc.description,
-      version: doc.version + 1,
-      created: doc.created,
-      updated: today(),
-      body: result.join("\n").trim(),
-    }));
+    await this.atomicWrite(
+      doc.path,
+      formatFrontmatter({
+        name: doc.name,
+        displayName: doc.displayName,
+        description: doc.description,
+        version: doc.version + 1,
+        created: doc.created,
+        updated: today(),
+        body: result.join("\n").trim(),
+      }),
+    );
 
     return {
       success: true,
@@ -523,12 +615,19 @@ export class SkillStore {
     };
   }
 
-  async edit(skillId: string, description: string, body: string): Promise<SkillResult> {
+  async edit(
+    skillId: string,
+    description: string,
+    body: string,
+  ): Promise<SkillResult> {
     description = description.trim();
     body = body.trim();
 
     if (!description && !body) {
-      return { success: false, error: "At least one of description or body is required." };
+      return {
+        success: false,
+        error: "At least one of description or body is required.",
+      };
     }
 
     const doc = await this.loadSkill(skillId);
@@ -539,15 +638,18 @@ export class SkillStore {
     const scanError = scanContent(`${newDescription} ${newBody}`);
     if (scanError) return { success: false, error: scanError };
 
-    await this.atomicWrite(doc.path, formatFrontmatter({
-      name: doc.name,
-      displayName: doc.displayName,
-      description: newDescription,
-      version: doc.version + 1,
-      created: doc.created,
-      updated: today(),
-      body: newBody,
-    }));
+    await this.atomicWrite(
+      doc.path,
+      formatFrontmatter({
+        name: doc.name,
+        displayName: doc.displayName,
+        description: newDescription,
+        version: doc.version + 1,
+        created: doc.created,
+        updated: today(),
+        body: newBody,
+      }),
+    );
 
     return {
       success: true,
@@ -564,7 +666,8 @@ export class SkillStore {
     if (!doc) return { success: false, error: `Skill '${skillId}' not found.` };
 
     const parsed = parseSkillId(skillId);
-    if (!parsed) return { success: false, error: `Skill '${skillId}' is invalid.` };
+    if (!parsed)
+      return { success: false, error: `Skill '${skillId}' is invalid.` };
 
     if (doc.scope === targetScope) {
       return {
@@ -579,10 +682,17 @@ export class SkillStore {
 
     const targetRoot = this.getScopeRoot(targetScope);
     if (!targetRoot) {
-      return { success: false, error: "Project skills require an active project." };
+      return {
+        success: false,
+        error: "Project skills require an active project.",
+      };
     }
 
-    const targetSkillId = buildSkillId(targetScope, parsed.slug, this.projectName);
+    const targetSkillId = buildSkillId(
+      targetScope,
+      parsed.slug,
+      this.projectName,
+    );
     const targetPath = path.join(targetRoot, parsed.slug, "SKILL.md");
     if (await exists(targetPath)) {
       return {
@@ -595,7 +705,10 @@ export class SkillStore {
     }
 
     if (targetScope === "global") {
-      const similarSkillIds = await this.findSimilarGlobalSkillIds(parsed.slug, doc.description);
+      const similarSkillIds = await this.findSimilarGlobalSkillIds(
+        parsed.slug,
+        doc.description,
+      );
       if (similarSkillIds.length > 0) {
         const targetId = similarSkillIds[0];
         return {
@@ -607,7 +720,10 @@ export class SkillStore {
         };
       }
 
-      const collidingNameSkillIds = await this.findNameCollisionGlobalSkillIds(parsed.slug, doc.description);
+      const collidingNameSkillIds = await this.findNameCollisionGlobalSkillIds(
+        parsed.slug,
+        doc.description,
+      );
       if (collidingNameSkillIds.length > 0) {
         const targetId = collidingNameSkillIds[0];
         return {
@@ -627,7 +743,10 @@ export class SkillStore {
       await fs.rename(doc.path, targetPath);
 
       if (path.basename(doc.path) === "SKILL.md") {
-        await this.removeEmptyParents(path.dirname(doc.path), this.getScopeRoot(doc.scope));
+        await this.removeEmptyParents(
+          path.dirname(doc.path),
+          this.getScopeRoot(doc.scope),
+        );
       }
 
       return {
@@ -650,20 +769,26 @@ export class SkillStore {
     }
 
     // Cross-device fallback: copy then remove source.
-    await this.atomicWrite(targetPath, formatFrontmatter({
-      name: parsed.slug,
-      displayName: doc.displayName,
-      description: doc.description,
-      version: doc.version,
-      created: doc.created,
-      updated: doc.updated,
-      body: doc.body,
-    }));
+    await this.atomicWrite(
+      targetPath,
+      formatFrontmatter({
+        name: parsed.slug,
+        displayName: doc.displayName,
+        description: doc.description,
+        version: doc.version,
+        created: doc.created,
+        updated: doc.updated,
+        body: doc.body,
+      }),
+    );
 
     try {
       await fs.unlink(doc.path);
       if (path.basename(doc.path) === "SKILL.md") {
-        await this.removeEmptyParents(path.dirname(doc.path), this.getScopeRoot(doc.scope));
+        await this.removeEmptyParents(
+          path.dirname(doc.path),
+          this.getScopeRoot(doc.scope),
+        );
       }
     } catch (error) {
       // Best-effort rollback: remove the destination copy if source removal fails,
@@ -672,7 +797,10 @@ export class SkillStore {
       try {
         await fs.unlink(targetPath);
         if (path.basename(targetPath) === "SKILL.md") {
-          await this.removeEmptyParents(path.dirname(targetPath), this.getScopeRoot(targetScope));
+          await this.removeEmptyParents(
+            path.dirname(targetPath),
+            this.getScopeRoot(targetScope),
+          );
         }
       } catch {
         rollbackFailed = true;
@@ -702,7 +830,10 @@ export class SkillStore {
 
     await fs.unlink(doc.path);
     if (path.basename(doc.path) === "SKILL.md") {
-      await this.removeEmptyParents(path.dirname(doc.path), this.getScopeRoot(doc.scope));
+      await this.removeEmptyParents(
+        path.dirname(doc.path),
+        this.getScopeRoot(doc.scope),
+      );
     }
 
     return {
@@ -715,7 +846,12 @@ export class SkillStore {
     };
   }
 
-  private resolveScope(scope: SkillScope | undefined, name: string, description: string, body: string): SkillScope {
+  private resolveScope(
+    scope: SkillScope | undefined,
+    name: string,
+    description: string,
+    body: string,
+  ): SkillScope {
     if (scope) return scope;
     if (!this.projectSkillsDir || !this.projectName) return "global";
 
@@ -724,62 +860,113 @@ export class SkillStore {
 
     const strongSignals = [
       haystack.includes(projectLower),
-      /\bthis repo\b|\bthis repository\b|\bthis project\b|\bour codebase\b|\bour app\b/.test(haystack),
-      /\bpackage\.json\b|\bpnpm-lock\.yaml\b|\byarn\.lock\b|\btsconfig\.json\b|\bdocker-compose(\.ya?ml)?\b|\b\.env(\.[a-z0-9._-]+)?\b/.test(haystack),
-      /(^|\s)(src|app|apps|packages|services|scripts|tests|docs|infra|migrations|db|api|web|frontend|backend)\/[a-z0-9._/-]+/m.test(haystack),
-      /\b(npm|pnpm|yarn|bun)\s+(run|test|build|dev|lint|deploy)\b/.test(haystack),
+      /\bthis repo\b|\bthis repository\b|\bthis project\b|\bour codebase\b|\bour app\b/.test(
+        haystack,
+      ),
+      /\bpackage\.json\b|\bpnpm-lock\.yaml\b|\byarn\.lock\b|\btsconfig\.json\b|\bdocker-compose(\.ya?ml)?\b|\b\.env(\.[a-z0-9._-]+)?\b/.test(
+        haystack,
+      ),
+      /(^|\s)(src|app|apps|packages|services|scripts|tests|docs|infra|migrations|db|api|web|frontend|backend)\/[a-z0-9._/-]+/m.test(
+        haystack,
+      ),
+      /\b(npm|pnpm|yarn|bun)\s+(run|test|build|dev|lint|deploy)\b/.test(
+        haystack,
+      ),
     ].filter(Boolean).length;
 
     const weakerSignals = [
-      /\bdeploy\b|\brelease\b|\bmigrate\b|\bmonorepo\b|\bworkspace\b|\bstaging\b|\bproduction\b/.test(haystack),
-      /\bteam convention\b|\bcodebase convention\b|\brepo convention\b/.test(haystack),
+      /\bdeploy\b|\brelease\b|\bmigrate\b|\bmonorepo\b|\bworkspace\b|\bstaging\b|\bproduction\b/.test(
+        haystack,
+      ),
+      /\bteam convention\b|\bcodebase convention\b|\brepo convention\b/.test(
+        haystack,
+      ),
     ].filter(Boolean).length;
 
-    return strongSignals >= 2 || (strongSignals >= 1 && weakerSignals >= 1) ? "project" : "global";
+    return strongSignals >= 2 || (strongSignals >= 1 && weakerSignals >= 1)
+      ? "project"
+      : "global";
   }
 
   private getScopeRoot(scope: SkillScope): string | null {
     return scope === "global" ? this.globalSkillsDir : this.projectSkillsDir;
   }
 
-  private async findSimilarGlobalSkillIds(candidateSlug: string, candidateDescription: string): Promise<string[]> {
+  private async findSimilarGlobalSkillIds(
+    candidateSlug: string,
+    candidateDescription: string,
+  ): Promise<string[]> {
     const NAME_SIMILARITY_THRESHOLD = 0.7;
     const DESCRIPTION_SIMILARITY_THRESHOLD = 0.75;
 
-    const scored = await this.scoreGlobalSimilarity(candidateSlug, candidateDescription);
+    const scored = await this.scoreGlobalSimilarity(
+      candidateSlug,
+      candidateDescription,
+    );
 
     return scored
-      .filter((entry) => entry.nameSimilarity > NAME_SIMILARITY_THRESHOLD
-        && entry.descriptionSimilarity > DESCRIPTION_SIMILARITY_THRESHOLD)
+      .filter(
+        (entry) =>
+          entry.nameSimilarity > NAME_SIMILARITY_THRESHOLD &&
+          entry.descriptionSimilarity > DESCRIPTION_SIMILARITY_THRESHOLD,
+      )
       .map((entry) => entry.skillId);
   }
 
-  private async findNameCollisionGlobalSkillIds(candidateSlug: string, candidateDescription: string): Promise<string[]> {
+  private async findNameCollisionGlobalSkillIds(
+    candidateSlug: string,
+    candidateDescription: string,
+  ): Promise<string[]> {
     const NAME_SIMILARITY_THRESHOLD = 0.7;
     const DESCRIPTION_SIMILARITY_THRESHOLD = 0.75;
 
-    const scored = await this.scoreGlobalSimilarity(candidateSlug, candidateDescription);
+    const scored = await this.scoreGlobalSimilarity(
+      candidateSlug,
+      candidateDescription,
+    );
 
     return scored
-      .filter((entry) => entry.nameSimilarity > NAME_SIMILARITY_THRESHOLD
-        && entry.descriptionSimilarity <= DESCRIPTION_SIMILARITY_THRESHOLD)
+      .filter(
+        (entry) =>
+          entry.nameSimilarity > NAME_SIMILARITY_THRESHOLD &&
+          entry.descriptionSimilarity <= DESCRIPTION_SIMILARITY_THRESHOLD,
+      )
       .map((entry) => entry.skillId);
   }
 
   private async scoreGlobalSimilarity(
     candidateSlug: string,
     candidateDescription: string,
-  ): Promise<Array<{ skillId: string; nameSimilarity: number; descriptionSimilarity: number }>> {
+  ): Promise<
+    Array<{
+      skillId: string;
+      nameSimilarity: number;
+      descriptionSimilarity: number;
+    }>
+  > {
     const globals = await this.loadIndex("global");
-    const candidateNameTokens = tokenizeForSimilarity(candidateSlug.replace(/-/g, " "));
-    const candidateDescriptionTokens = tokenizeForSimilarity(candidateDescription);
+    const candidateNameTokens = tokenizeForSimilarity(
+      candidateSlug.replace(/-/g, " "),
+    );
+    const candidateDescriptionTokens =
+      tokenizeForSimilarity(candidateDescription);
 
     return globals
       .map((skill) => {
-        const nameTokens = tokenizeForSimilarity((skill.displayName || skill.name).replace(/-/g, " "));
-        const descriptionTokens = tokenizeForSimilarity(skill.description || "");
-        const nameSimilarity = jaccardSimilarity(candidateNameTokens, nameTokens);
-        const descriptionSimilarity = jaccardSimilarity(candidateDescriptionTokens, descriptionTokens);
+        const nameTokens = tokenizeForSimilarity(
+          (skill.displayName || skill.name).replace(/-/g, " "),
+        );
+        const descriptionTokens = tokenizeForSimilarity(
+          skill.description || "",
+        );
+        const nameSimilarity = jaccardSimilarity(
+          candidateNameTokens,
+          nameTokens,
+        );
+        const descriptionSimilarity = jaccardSimilarity(
+          candidateDescriptionTokens,
+          descriptionTokens,
+        );
 
         return {
           skillId: skill.skillId,
@@ -799,7 +986,12 @@ export class SkillStore {
     const seen = new Set<string>();
 
     if (!scope || scope === "global") {
-      const globalLocations = await this.scanScope(this.globalSkillsDir, "global", true, this.projectName ?? undefined);
+      const globalLocations = await this.scanScope(
+        this.globalSkillsDir,
+        "global",
+        true,
+        this.projectName ?? undefined,
+      );
       for (const location of globalLocations) {
         if (seen.has(location.skillId)) continue;
         seen.add(location.skillId);
@@ -807,8 +999,17 @@ export class SkillStore {
       }
     }
 
-    if ((!scope || scope === "project") && this.projectSkillsDir && this.projectName) {
-      const projectLocations = await this.scanScope(this.projectSkillsDir, "project", false, this.projectName);
+    if (
+      (!scope || scope === "project") &&
+      this.projectSkillsDir &&
+      this.projectName
+    ) {
+      const projectLocations = await this.scanScope(
+        this.projectSkillsDir,
+        "project",
+        false,
+        this.projectName,
+      );
       for (const location of projectLocations) {
         if (seen.has(location.skillId)) continue;
         seen.add(location.skillId);
@@ -825,13 +1026,17 @@ export class SkillStore {
     allowRootMarkdown: boolean,
     projectName?: string,
   ): Promise<SkillLocation[]> {
-    if (!await exists(root)) return [];
+    if (!(await exists(root))) return [];
     const results: SkillLocation[] = [];
 
     const walk = async (dir: string, isRoot: boolean): Promise<void> => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      const dirs = entries.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
-      const files = entries.filter((entry) => entry.isFile()).sort((a, b) => a.name.localeCompare(b.name));
+      const dirs = entries
+        .filter((entry) => entry.isDirectory())
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const files = entries
+        .filter((entry) => entry.isFile())
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       for (const entry of dirs) {
         if (entry.name.startsWith(".")) continue;
@@ -871,7 +1076,9 @@ export class SkillStore {
     return results;
   }
 
-  private async findLocationById(skillId: string): Promise<SkillLocation | null> {
+  private async findLocationById(
+    skillId: string,
+  ): Promise<SkillLocation | null> {
     const parsed = parseSkillId(skillId);
     if (!parsed) return null;
 
@@ -879,7 +1086,9 @@ export class SkillStore {
     return locations.find((location) => location.skillId === skillId) ?? null;
   }
 
-  private async readLocation(location: SkillLocation): Promise<SkillDocument | null> {
+  private async readLocation(
+    location: SkillLocation,
+  ): Promise<SkillDocument | null> {
     try {
       const raw = await fs.readFile(location.path, "utf-8");
       const { meta, body } = parseFrontmatter(raw);
@@ -932,7 +1141,10 @@ export class SkillStore {
     await fs.rename(tempFile, filePath);
   }
 
-  private async removeEmptyParents(startDir: string, stopDir: string | null): Promise<void> {
+  private async removeEmptyParents(
+    startDir: string,
+    stopDir: string | null,
+  ): Promise<void> {
     if (!stopDir) return;
 
     let current = startDir;

@@ -36,7 +36,10 @@ import type {
   MemoryOverflowStrategy,
 } from "../types.js";
 import { AGENT_ROOT } from "../paths.js";
-import { canonicalMarkdownIdentity, withMarkdownMutationLock } from "./markdown-mutation-lock.js";
+import {
+  canonicalMarkdownIdentity,
+  withMarkdownMutationLock,
+} from "./markdown-mutation-lock.js";
 
 const MAX_EXTERNAL_WRITE_RETRIES = 2;
 const RECOVERY_ACTIVE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -58,11 +61,24 @@ export class MemoryStore {
   private userEntries: string[] = [];
   private failureEntries: string[] = [];
   private fileFingerprints: Record<string, string> = {};
-  private storagePaths: Partial<Record<"memory" | "user" | "failure", string>> = {};
+  private storagePaths: Partial<Record<"memory" | "user" | "failure", string>> =
+    {};
   private snapshot: MemorySnapshot = { memory: "", user: "" };
-  private consolidator: ((target: "memory" | "user" | "failure", signal?: AbortSignal) => Promise<ConsolidationResult>) | null = null;
-  private overflowSince: Partial<Record<"memory" | "user" | "failure", number>> = {};
-  private mutationObserver: ((target: "memory" | "user" | "failure", entries: string[]) => Promise<string | null | undefined>) | null = null;
+  private consolidator:
+    | ((
+        target: "memory" | "user" | "failure",
+        signal?: AbortSignal,
+      ) => Promise<ConsolidationResult>)
+    | null = null;
+  private overflowSince: Partial<
+    Record<"memory" | "user" | "failure", number>
+  > = {};
+  private mutationObserver:
+    | ((
+        target: "memory" | "user" | "failure",
+        entries: string[],
+      ) => Promise<string | null | undefined>)
+    | null = null;
 
   constructor(private config: MemoryConfig) {}
 
@@ -70,12 +86,20 @@ export class MemoryStore {
    * Inject a consolidation function (avoids circular imports).
    * Called from index.ts after both store and pi are available.
    */
-  setConsolidator(fn: (target: "memory" | "user" | "failure", signal?: AbortSignal) => Promise<ConsolidationResult>): void {
+  setConsolidator(
+    fn: (
+      target: "memory" | "user" | "failure",
+      signal?: AbortSignal,
+    ) => Promise<ConsolidationResult>,
+  ): void {
     this.consolidator = fn;
   }
 
   setMutationObserver(
-    fn: (target: "memory" | "user" | "failure", entries: string[]) => Promise<string | null | undefined>,
+    fn: (
+      target: "memory" | "user" | "failure",
+      entries: string[],
+    ) => Promise<string | null | undefined>,
   ): void {
     this.mutationObserver = fn;
   }
@@ -83,7 +107,7 @@ export class MemoryStore {
   // ─── Path helpers ───
 
   private get memoryDir(): string {
-    return this.config.memoryDir ?? path.join(AGENT_ROOT, "pi-hermes-memory");
+    return this.config.memoryDir ?? path.join(AGENT_ROOT, "pi-eric-memory");
   }
 
   private pathFor(target: "memory" | "user" | "failure"): string {
@@ -92,11 +116,15 @@ export class MemoryStore {
     return path.join(this.memoryDir, MEMORY_FILE);
   }
 
-  async getStorageIdentity(target: "memory" | "user" | "failure"): Promise<string> {
+  async getStorageIdentity(
+    target: "memory" | "user" | "failure",
+  ): Promise<string> {
     return this.resolveStoragePath(target);
   }
 
-  private async resolveStoragePath(target: "memory" | "user" | "failure"): Promise<string> {
+  private async resolveStoragePath(
+    target: "memory" | "user" | "failure",
+  ): Promise<string> {
     const cached = this.storagePaths[target];
     if (cached) return cached;
     const resolved = await canonicalMarkdownIdentity(this.pathFor(target));
@@ -110,7 +138,10 @@ export class MemoryStore {
     return this.memoryEntries;
   }
 
-  private setEntries(target: "memory" | "user" | "failure", entries: string[]): void {
+  private setEntries(
+    target: "memory" | "user" | "failure",
+    entries: string[],
+  ): void {
     if (target === "user") this.userEntries = entries;
     else if (target === "failure") this.failureEntries = entries;
     else this.memoryEntries = entries;
@@ -118,7 +149,9 @@ export class MemoryStore {
 
   private charLimit(target: "memory" | "user" | "failure"): number {
     if (target === "failure") return this.config.memoryCharLimit * 2; // Failures get more space
-    return target === "user" ? this.config.userCharLimit : this.config.memoryCharLimit;
+    return target === "user"
+      ? this.config.userCharLimit
+      : this.config.memoryCharLimit;
   }
   private get capEnforced(): boolean {
     return this.config.memoryMode !== "policy-only";
@@ -130,11 +163,16 @@ export class MemoryStore {
   }
 
   private memoryOverflowStrategy(): MemoryOverflowStrategy {
-    return this.config.memoryOverflowStrategy ?? (this.config.autoConsolidate ? "auto-consolidate" : "reject");
+    return (
+      this.config.memoryOverflowStrategy ??
+      (this.config.autoConsolidate ? "auto-consolidate" : "reject")
+    );
   }
   private overflowGraceMs(): number {
     const configured = this.config.overflowGraceMs;
-    return Number.isFinite(configured) && configured !== undefined && configured >= 0
+    return Number.isFinite(configured) &&
+      configured !== undefined &&
+      configured >= 0
       ? configured
       : DEFAULT_OVERFLOW_GRACE_MS;
   }
@@ -178,27 +216,47 @@ export class MemoryStore {
   async maintainRecoveryFiles(): Promise<void> {
     for (const target of ["memory", "user", "failure"] as const) {
       const filePath = await this.resolveStoragePath(target);
-      await withMarkdownMutationLock(filePath, () => this.pruneRecoveryFiles(filePath));
+      await withMarkdownMutationLock(filePath, () =>
+        this.pruneRecoveryFiles(filePath),
+      );
     }
   }
 
   // ─── CRUD ───
 
-  async add(target: "memory" | "user" | "failure", content: string, signal?: AbortSignal): Promise<MemoryResult> {
-    return this.addWithConsolidation(target, content, signal, 1, "Entry added.");
+  async add(
+    target: "memory" | "user" | "failure",
+    content: string,
+    signal?: AbortSignal,
+  ): Promise<MemoryResult> {
+    return this.addWithConsolidation(
+      target,
+      content,
+      signal,
+      1,
+      "Entry added.",
+    );
   }
 
-  async addFailure(content: string, options: {
-    category: MemoryCategory;
-    failureReason?: string;
-    toolState?: string;
-    correctedTo?: string;
-    project?: string;
-    signal?: AbortSignal;
-  }): Promise<MemoryResult> {
+  async addFailure(
+    content: string,
+    options: {
+      category: MemoryCategory;
+      failureReason?: string;
+      toolState?: string;
+      correctedTo?: string;
+      project?: string;
+      signal?: AbortSignal;
+    },
+  ): Promise<MemoryResult> {
     const failureText = this.buildFailureMemoryText(content, options);
     return this.addWithConsolidation(
-      "failure", failureText, options.signal, 1, "Failure memory saved: " + options.category, options.project,
+      "failure",
+      failureText,
+      options.signal,
+      1,
+      "Failure memory saved: " + options.category,
+      options.project,
     );
   }
 
@@ -237,11 +295,16 @@ export class MemoryStore {
     const normalizedProject = project?.trim() || null;
     const duplicate = entries.some((entry) => {
       const decoded = this.decodeEntry(entry);
-      return decoded.text === content
-        && (target !== "failure" || decoded.project === normalizedProject);
+      return (
+        decoded.text === content &&
+        (target !== "failure" || decoded.project === normalizedProject)
+      );
     });
     if (duplicate) {
-      return this.successResponse(target, "Entry already exists (no duplicate added).");
+      return this.successResponse(
+        target,
+        "Entry already exists (no duplicate added).",
+      );
     }
 
     // Encode metadata: both dates = today
@@ -254,7 +317,13 @@ export class MemoryStore {
       const strategy = this.memoryOverflowStrategy();
 
       if (strategy === "fifo-evict") {
-        const result = await this.fifoEvictAndAdd(target, entries, encoded, content.length, limit);
+        const result = await this.fifoEvictAndAdd(
+          target,
+          entries,
+          encoded,
+          content.length,
+          limit,
+        );
         if (result.success) markMutation();
         return result;
       }
@@ -280,15 +349,16 @@ export class MemoryStore {
   ): Promise<MemoryResult> {
     const result = await this.runTargetMutation(
       target,
-      (markMutation) => this._add(target, content, signal, addedMessage, project, markMutation),
+      (markMutation) =>
+        this._add(target, content, signal, addedMessage, project, markMutation),
       signal,
     );
     if (
-      result.success
-      || retriesLeft <= 0
-      || this.memoryOverflowStrategy() !== "auto-consolidate"
-      || !this.consolidator
-      || !result.error?.startsWith("Memory at ")
+      result.success ||
+      retriesLeft <= 0 ||
+      this.memoryOverflowStrategy() !== "auto-consolidate" ||
+      !this.consolidator ||
+      !result.error?.startsWith("Memory at ")
     ) {
       return result;
     }
@@ -303,7 +373,10 @@ export class MemoryStore {
     // kill) used to be swallowed here and present identically to a plain capacity
     // error, making the auto path impossible to diagnose from outside (#135).
     const consolidation = await this.consolidator(target, signal).catch(
-      (err): ConsolidationResult => ({ consolidated: false, error: `consolidator threw ${String(err).slice(0, 200)}` }),
+      (err): ConsolidationResult => ({
+        consolidated: false,
+        error: `consolidator threw ${String(err).slice(0, 200)}`,
+      }),
     );
     if (consolidation.deferred) {
       // Lock contention, not breakage — another session is consolidating this
@@ -316,18 +389,35 @@ export class MemoryStore {
     }
     if (!consolidation.consolidated) {
       const reason = consolidation.error || "no reason reported";
-      return { ...result, error: `${result.error} Auto-consolidation attempted but failed: ${reason}` };
+      return {
+        ...result,
+        error: `${result.error} Auto-consolidation attempted but failed: ${reason}`,
+      };
     }
 
     try {
       await this.loadFromDisk();
     } catch (err) {
-      return { ...result, error: `${result.error} Auto-consolidation succeeded but reloading memory failed: ${String(err).slice(0, 200)}` };
+      return {
+        ...result,
+        error: `${result.error} Auto-consolidation succeeded but reloading memory failed: ${String(err).slice(0, 200)}`,
+      };
     }
 
-    const retried = await this.addWithConsolidation(target, content, signal, retriesLeft - 1, addedMessage, project);
-    if (retried.success || !retried.error?.startsWith("Memory at ")) return retried;
-    return { ...retried, error: `${retried.error} Auto-consolidation ran but did not free enough space.` };
+    const retried = await this.addWithConsolidation(
+      target,
+      content,
+      signal,
+      retriesLeft - 1,
+      addedMessage,
+      project,
+    );
+    if (retried.success || !retried.error?.startsWith("Memory at "))
+      return retried;
+    return {
+      ...retried,
+      error: `${retried.error} Auto-consolidation ran but did not free enough space.`,
+    };
   }
 
   private async fifoEvictAndAdd(
@@ -344,7 +434,10 @@ export class MemoryStore {
     const remaining = [...entries];
     const evictedEntries: string[] = [];
 
-    while ([...remaining, encoded].join(ENTRY_DELIMITER).length > limit && remaining.length > 0) {
+    while (
+      [...remaining, encoded].join(ENTRY_DELIMITER).length > limit &&
+      remaining.length > 0
+    ) {
       const evicted = remaining.shift()!;
       evictedEntries.push(this.stripMetadata(evicted));
     }
@@ -363,10 +456,15 @@ export class MemoryStore {
     };
   }
 
-  private memoryFullError(target: "memory" | "user" | "failure", contentLength: number): MemoryResult {
+  private memoryFullError(
+    target: "memory" | "user" | "failure",
+    contentLength: number,
+  ): MemoryResult {
     const current = this.charCount(target);
     const limit = this.charLimit(target);
-    const entries = this.entriesFor(target).map((raw) => this.decodeEntry(raw).text);
+    const entries = this.entriesFor(target).map(
+      (raw) => this.decodeEntry(raw).text,
+    );
     return {
       success: false,
       error: `Memory at ${current}/${limit} chars. Adding this entry (${contentLength} chars) would exceed the limit. Replace or remove existing entries first (see the entries list below), then retry this add — all in this turn.`,
@@ -382,94 +480,166 @@ export class MemoryStore {
     operations: MemoryMutationOperation[],
     options: { requireShrink?: boolean; signal?: AbortSignal } = {},
   ): Promise<MemoryResult> {
-    return this.runTargetMutation(target, async (markMutation) => {
-      await this.syncTargetFromDiskIfChanged(target);
-      if (operations.length === 0) {
-        return { success: false, error: "Memory mutation plan requires at least one operation." };
-      }
-
-      const originalEntries = [...this.entriesFor(target)];
-      let plannedEntries = [...originalEntries];
-      const today = new Date().toISOString().split("T")[0];
-
-      for (const operation of operations) {
-        if (operation.action === "add") {
-          const content = operation.content?.trim() ?? "";
-          if (!content) return { success: false, error: "Memory mutation add requires content." };
-          const normalizedContent = target === "failure" && operation.category
-            ? this.buildFailureMemoryText(content, {
-                category: operation.category,
-                failureReason: operation.failureReason,
-                project: operation.project,
-              })
-            : content;
-          const scanError = scanContent(normalizedContent);
-          if (scanError) return { success: false, error: scanError };
-          const normalizedProject = operation.project?.trim() || null;
-          if (plannedEntries.some((entry) => {
-            const decoded = this.decodeEntry(entry);
-            return decoded.text === normalizedContent
-              && (target !== "failure" || decoded.project === normalizedProject);
-          })) {
-            return { success: false, error: "Memory mutation plan would add a duplicate entry." };
-          }
-          plannedEntries.push(this.encodeEntry(normalizedContent, today, today, operation.project));
-          continue;
-        }
-
-        const oldText = normalizeMemoryLookupText(operation.oldText ?? "");
-        if (!oldText) return { success: false, error: `Memory mutation ${operation.action} requires old_text.` };
-        const matches = plannedEntries.filter((entry) => this.stripMetadata(entry).includes(oldText));
-        if (matches.length === 0) return { success: false, error: `No entry matched '${oldText}'.` };
-        if (matches.length > 1 && !this.areDistinctScopedFailureCopies(target, matches)) {
-          return { success: false, error: `Multiple entries matched '${oldText}'. Be more specific.` };
-        }
-
-        if (operation.action === "remove") {
-          const matchedEntries = new Set(matches);
-          plannedEntries = plannedEntries.filter((entry) => !matchedEntries.has(entry));
-          continue;
-        }
-
-        const content = operation.content?.trim() ?? "";
-        if (!content) return { success: false, error: "Memory mutation replace requires content." };
-        const scanError = scanContent(content);
-        if (scanError) return { success: false, error: scanError };
-        const replacementError = this.validateWholeEntryReplacement(matches, oldText, content);
-        if (replacementError) return { success: false, error: replacementError };
-        const replacements = new Map(matches.map((entry) => {
-          const decoded = this.decodeEntry(entry);
-          return [entry, this.encodeEntry(content, decoded.created, today, decoded.project ?? undefined)];
-        }));
-        plannedEntries = plannedEntries.map((entry) => replacements.get(entry) ?? entry);
-      }
-
-      const originalTotal = originalEntries.join(ENTRY_DELIMITER).length;
-      const plannedTotal = plannedEntries.join(ENTRY_DELIMITER).length;
-      if (this.capEnforced && plannedTotal > this.charLimit(target)) {
-        return {
-          success: false,
-          error: `Memory mutation plan would put memory at ${plannedTotal}/${this.charLimit(target)} chars.`,
-        };
-      }
-      if (options.requireShrink && plannedTotal >= originalTotal) {
-        return {
-          success: false,
-          error: `Memory mutation plan did not shrink the target (${originalTotal} -> ${plannedTotal} chars).`,
-        };
-      }
-
-      this.setEntries(target, plannedEntries);
-      await this.saveToDisk(target);
-      markMutation();
-      return this.successResponse(target, `Applied ${operations.length} memory operations atomically.`);
-    }, options.signal);
-  }
-
-  async replace(target: "memory" | "user" | "failure", oldText: string, newContent: string, signal?: AbortSignal): Promise<MemoryResult> {
     return this.runTargetMutation(
       target,
-      (markMutation) => this.replaceUnlocked(target, oldText, newContent, markMutation),
+      async (markMutation) => {
+        await this.syncTargetFromDiskIfChanged(target);
+        if (operations.length === 0) {
+          return {
+            success: false,
+            error: "Memory mutation plan requires at least one operation.",
+          };
+        }
+
+        const originalEntries = [...this.entriesFor(target)];
+        let plannedEntries = [...originalEntries];
+        const today = new Date().toISOString().split("T")[0];
+
+        for (const operation of operations) {
+          if (operation.action === "add") {
+            const content = operation.content?.trim() ?? "";
+            if (!content)
+              return {
+                success: false,
+                error: "Memory mutation add requires content.",
+              };
+            const normalizedContent =
+              target === "failure" && operation.category
+                ? this.buildFailureMemoryText(content, {
+                    category: operation.category,
+                    failureReason: operation.failureReason,
+                    project: operation.project,
+                  })
+                : content;
+            const scanError = scanContent(normalizedContent);
+            if (scanError) return { success: false, error: scanError };
+            const normalizedProject = operation.project?.trim() || null;
+            if (
+              plannedEntries.some((entry) => {
+                const decoded = this.decodeEntry(entry);
+                return (
+                  decoded.text === normalizedContent &&
+                  (target !== "failure" ||
+                    decoded.project === normalizedProject)
+                );
+              })
+            ) {
+              return {
+                success: false,
+                error: "Memory mutation plan would add a duplicate entry.",
+              };
+            }
+            plannedEntries.push(
+              this.encodeEntry(
+                normalizedContent,
+                today,
+                today,
+                operation.project,
+              ),
+            );
+            continue;
+          }
+
+          const oldText = normalizeMemoryLookupText(operation.oldText ?? "");
+          if (!oldText)
+            return {
+              success: false,
+              error: `Memory mutation ${operation.action} requires old_text.`,
+            };
+          const matches = plannedEntries.filter((entry) =>
+            this.stripMetadata(entry).includes(oldText),
+          );
+          if (matches.length === 0)
+            return { success: false, error: `No entry matched '${oldText}'.` };
+          if (
+            matches.length > 1 &&
+            !this.areDistinctScopedFailureCopies(target, matches)
+          ) {
+            return {
+              success: false,
+              error: `Multiple entries matched '${oldText}'. Be more specific.`,
+            };
+          }
+
+          if (operation.action === "remove") {
+            const matchedEntries = new Set(matches);
+            plannedEntries = plannedEntries.filter(
+              (entry) => !matchedEntries.has(entry),
+            );
+            continue;
+          }
+
+          const content = operation.content?.trim() ?? "";
+          if (!content)
+            return {
+              success: false,
+              error: "Memory mutation replace requires content.",
+            };
+          const scanError = scanContent(content);
+          if (scanError) return { success: false, error: scanError };
+          const replacementError = this.validateWholeEntryReplacement(
+            matches,
+            oldText,
+            content,
+          );
+          if (replacementError)
+            return { success: false, error: replacementError };
+          const replacements = new Map(
+            matches.map((entry) => {
+              const decoded = this.decodeEntry(entry);
+              return [
+                entry,
+                this.encodeEntry(
+                  content,
+                  decoded.created,
+                  today,
+                  decoded.project ?? undefined,
+                ),
+              ];
+            }),
+          );
+          plannedEntries = plannedEntries.map(
+            (entry) => replacements.get(entry) ?? entry,
+          );
+        }
+
+        const originalTotal = originalEntries.join(ENTRY_DELIMITER).length;
+        const plannedTotal = plannedEntries.join(ENTRY_DELIMITER).length;
+        if (this.capEnforced && plannedTotal > this.charLimit(target)) {
+          return {
+            success: false,
+            error: `Memory mutation plan would put memory at ${plannedTotal}/${this.charLimit(target)} chars.`,
+          };
+        }
+        if (options.requireShrink && plannedTotal >= originalTotal) {
+          return {
+            success: false,
+            error: `Memory mutation plan did not shrink the target (${originalTotal} -> ${plannedTotal} chars).`,
+          };
+        }
+
+        this.setEntries(target, plannedEntries);
+        await this.saveToDisk(target);
+        markMutation();
+        return this.successResponse(
+          target,
+          `Applied ${operations.length} memory operations atomically.`,
+        );
+      },
+      options.signal,
+    );
+  }
+
+  async replace(
+    target: "memory" | "user" | "failure",
+    oldText: string,
+    newContent: string,
+    signal?: AbortSignal,
+  ): Promise<MemoryResult> {
+    return this.runTargetMutation(
+      target,
+      (markMutation) =>
+        this.replaceUnlocked(target, oldText, newContent, markMutation),
       signal,
     );
   }
@@ -483,7 +653,11 @@ export class MemoryStore {
     oldText = normalizeMemoryLookupText(oldText);
     newContent = newContent.trim();
     if (!oldText) return { success: false, error: "old_text cannot be empty." };
-    if (!newContent) return { success: false, error: "new_content cannot be empty. Use 'remove' to delete entries." };
+    if (!newContent)
+      return {
+        success: false,
+        error: "new_content cannot be empty. Use 'remove' to delete entries.",
+      };
 
     const scanError = scanContent(newContent);
     if (scanError) return { success: false, error: scanError };
@@ -491,25 +665,50 @@ export class MemoryStore {
     await this.syncTargetFromDiskIfChanged(target);
     const entries = this.entriesFor(target);
     // Match against stripped text (entries may have metadata comments)
-    const matches = entries.filter((e) => this.stripMetadata(e).includes(oldText));
+    const matches = entries.filter((e) =>
+      this.stripMetadata(e).includes(oldText),
+    );
 
-    if (matches.length === 0) return { success: false, error: `No entry matched '${oldText}'.` };
-    if (matches.length > 1 && !this.areDistinctScopedFailureCopies(target, matches)) {
+    if (matches.length === 0)
+      return { success: false, error: `No entry matched '${oldText}'.` };
+    if (
+      matches.length > 1 &&
+      !this.areDistinctScopedFailureCopies(target, matches)
+    ) {
       return {
         success: false,
         error: `Multiple entries matched '${oldText}'. Be more specific.`,
-        matches: matches.map((e) => this.stripMetadata(e).slice(0, 80) + (e.length > 80 ? "..." : "")),
+        matches: matches.map(
+          (e) =>
+            this.stripMetadata(e).slice(0, 80) + (e.length > 80 ? "..." : ""),
+        ),
       };
     }
 
-    const replacementError = this.validateWholeEntryReplacement(matches, oldText, newContent);
+    const replacementError = this.validateWholeEntryReplacement(
+      matches,
+      oldText,
+      newContent,
+    );
     if (replacementError) return { success: false, error: replacementError };
     const today = new Date().toISOString().split("T")[0];
-    const replacements = new Map(matches.map((entry) => {
-      const decoded = this.decodeEntry(entry);
-      return [entry, this.encodeEntry(newContent, decoded.created, today, decoded.project ?? undefined)];
-    }));
-    const testEntries = entries.map((entry) => replacements.get(entry) ?? entry);
+    const replacements = new Map(
+      matches.map((entry) => {
+        const decoded = this.decodeEntry(entry);
+        return [
+          entry,
+          this.encodeEntry(
+            newContent,
+            decoded.created,
+            today,
+            decoded.project ?? undefined,
+          ),
+        ];
+      }),
+    );
+    const testEntries = entries.map(
+      (entry) => replacements.get(entry) ?? entry,
+    );
 
     const newTotal = testEntries.join(ENTRY_DELIMITER).length;
 
@@ -527,7 +726,11 @@ export class MemoryStore {
     return this.successResponse(target, "Entry replaced.");
   }
 
-  async remove(target: "memory" | "user" | "failure", oldText: string, signal?: AbortSignal): Promise<MemoryResult> {
+  async remove(
+    target: "memory" | "user" | "failure",
+    oldText: string,
+    signal?: AbortSignal,
+  ): Promise<MemoryResult> {
     return this.runTargetMutation(
       target,
       (markMutation) => this.removeUnlocked(target, oldText, markMutation),
@@ -545,19 +748,32 @@ export class MemoryStore {
 
     await this.syncTargetFromDiskIfChanged(target);
     const entries = this.entriesFor(target);
-    const matches = entries.filter((e) => this.stripMetadata(e).includes(oldText));
+    const matches = entries.filter((e) =>
+      this.stripMetadata(e).includes(oldText),
+    );
 
-    if (matches.length === 0) return { success: false, error: `No entry matched '${oldText}'.` };
-    if (matches.length > 1 && !this.areDistinctScopedFailureCopies(target, matches)) {
+    if (matches.length === 0)
+      return { success: false, error: `No entry matched '${oldText}'.` };
+    if (
+      matches.length > 1 &&
+      !this.areDistinctScopedFailureCopies(target, matches)
+    ) {
       return {
         success: false,
         error: `Multiple entries matched '${oldText}'. Be more specific.`,
-        matches: matches.map((e) => this.stripMetadata(e).slice(0, 80) + (this.stripMetadata(e).length > 80 ? "..." : "")),
+        matches: matches.map(
+          (e) =>
+            this.stripMetadata(e).slice(0, 80) +
+            (this.stripMetadata(e).length > 80 ? "..." : ""),
+        ),
       };
     }
 
     const matchedEntries = new Set(matches);
-    this.setEntries(target, entries.filter((entry) => !matchedEntries.has(entry)));
+    this.setEntries(
+      target,
+      entries.filter((entry) => !matchedEntries.has(entry)),
+    );
     await this.saveToDisk(target);
     markMutation();
 
@@ -573,11 +789,16 @@ export class MemoryStore {
 
     // Add recent failure memories
     if (this.config.failureInjectionEnabled !== false) {
-      const maxAgeDays = this.config.failureInjectionMaxAgeDays ?? DEFAULT_FAILURE_INJECTION_MAX_AGE_DAYS;
-      const maxFailures = this.config.failureInjectionMaxEntries ?? DEFAULT_FAILURE_INJECTION_MAX_ENTRIES;
+      const maxAgeDays =
+        this.config.failureInjectionMaxAgeDays ??
+        DEFAULT_FAILURE_INJECTION_MAX_AGE_DAYS;
+      const maxFailures =
+        this.config.failureInjectionMaxEntries ??
+        DEFAULT_FAILURE_INJECTION_MAX_ENTRIES;
       const recentFailures = this.getFailureEntries(maxAgeDays);
       if (recentFailures.length > 0) {
-        const failures = maxFailures > 0 ? recentFailures.slice(-maxFailures).reverse() : [];
+        const failures =
+          maxFailures > 0 ? recentFailures.slice(-maxFailures).reverse() : [];
         if (failures.length > 0) {
           const failureBlock = this.renderFailureBlock(failures);
           parts.push(this.fenceBlock(failureBlock));
@@ -625,7 +846,12 @@ export class MemoryStore {
    * Encode metadata (created, lastReferenced) as an HTML comment appended to entry text.
    * The comment is invisible in markdown and transparent to the § delimiter.
    */
-  private encodeEntry(text: string, created: string, lastReferenced: string, project?: string): string {
+  private encodeEntry(
+    text: string,
+    created: string,
+    lastReferenced: string,
+    project?: string,
+  ): string {
     const projectMetadata = project?.trim()
       ? `, project64=${Buffer.from(project.trim(), "utf-8").toString("base64url")}`
       : "";
@@ -636,18 +862,38 @@ export class MemoryStore {
    * Decode entry text, extracting metadata if present.
    * Falls back to today's date for legacy entries without metadata.
    */
-  private decodeEntry(raw: string): { text: string; created: string; lastReferenced: string; project: string | null } {
-    const match = raw.match(/^(.*?)\s*<!--\s*created=([^,]+),\s*last=([^,>]+)(?:,\s*project64=([A-Za-z0-9_-]+))?\s*-->\s*$/s);
+  private decodeEntry(raw: string): {
+    text: string;
+    created: string;
+    lastReferenced: string;
+    project: string | null;
+  } {
+    const match = raw.match(
+      /^(.*?)\s*<!--\s*created=([^,]+),\s*last=([^,>]+)(?:,\s*project64=([A-Za-z0-9_-]+))?\s*-->\s*$/s,
+    );
     if (match) {
       let project: string | null = null;
       if (match[4]) {
-        try { project = Buffer.from(match[4], "base64url").toString("utf-8").trim() || null; } catch {}
+        try {
+          project =
+            Buffer.from(match[4], "base64url").toString("utf-8").trim() || null;
+        } catch {}
       }
-      return { text: match[1].trim(), created: match[2].trim(), lastReferenced: match[3].trim(), project };
+      return {
+        text: match[1].trim(),
+        created: match[2].trim(),
+        lastReferenced: match[3].trim(),
+        project,
+      };
     }
     // Legacy entry without metadata — use today as default
     const today = new Date().toISOString().split("T")[0];
-    return { text: raw.trim(), created: today, lastReferenced: today, project: null };
+    return {
+      text: raw.trim(),
+      created: today,
+      lastReferenced: today,
+      project: null,
+    };
   }
 
   /** Strip metadata comment from entry text for display. */
@@ -660,9 +906,16 @@ export class MemoryStore {
    * both individual mutations and atomic plans by refusing a fragment that
    * omits sibling lines from a multi-fact entry.
    */
-  private validateWholeEntryReplacement(entries: string[], oldText: string, newContent: string): string | undefined {
+  private validateWholeEntryReplacement(
+    entries: string[],
+    oldText: string,
+    newContent: string,
+  ): string | undefined {
     for (const entry of entries) {
-      const entryLines = this.stripMetadata(entry).split("\n").map((line) => line.trim()).filter(Boolean);
+      const entryLines = this.stripMetadata(entry)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
       if (entryLines.length <= 1) continue;
       const missingLines = entryLines.filter(
         (line) => !line.includes(oldText) && !newContent.includes(line),
@@ -685,18 +938,25 @@ export class MemoryStore {
     entries: string[],
   ): boolean {
     if (target !== "failure") return false;
-    const visibleTexts = new Set(entries.map((entry) => this.stripMetadata(entry)));
-    const scopes = new Set(entries.map((entry) => this.decodeEntry(entry).project));
+    const visibleTexts = new Set(
+      entries.map((entry) => this.stripMetadata(entry)),
+    );
+    const scopes = new Set(
+      entries.map((entry) => this.decodeEntry(entry).project),
+    );
     return visibleTexts.size === 1 && scopes.size === entries.length;
   }
 
-  private buildFailureMemoryText(content: string, options: {
-    category: MemoryCategory;
-    failureReason?: string;
-    toolState?: string;
-    correctedTo?: string;
-    project?: string;
-  }): string {
+  private buildFailureMemoryText(
+    content: string,
+    options: {
+      category: MemoryCategory;
+      failureReason?: string;
+      toolState?: string;
+      correctedTo?: string;
+      project?: string;
+    },
+  ): string {
     const trimmedContent = content.trim();
     const categoryTag = "[" + options.category + "]";
     const parts = [categoryTag + " " + trimmedContent];
@@ -706,11 +966,15 @@ export class MemoryStore {
     return parts.join(" — ");
   }
 
-  private successResponse(target: "memory" | "user" | "failure", message?: string): MemoryResult {
+  private successResponse(
+    target: "memory" | "user" | "failure",
+    message?: string,
+  ): MemoryResult {
     const entries = this.entriesFor(target);
     const current = this.charCount(target);
     const limit = this.charLimit(target);
-    const pct = limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
+    const pct =
+      limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
 
     const resp: MemoryResult = {
       success: true,
@@ -727,11 +991,13 @@ export class MemoryStore {
     const limit = this.charLimit(target);
     const content = entries.join(ENTRY_DELIMITER);
     const current = content.length;
-    const pct = limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
+    const pct =
+      limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
 
-    const header = target === "user"
-      ? `USER PROFILE (who the user is) [${pct}% — ${current}/${limit} chars]`
-      : `MEMORY (your personal notes) [${pct}% — ${current}/${limit} chars]`;
+    const header =
+      target === "user"
+        ? `USER PROFILE (who the user is) [${pct}% — ${current}/${limit} chars]`
+        : `MEMORY (your personal notes) [${pct}% — ${current}/${limit} chars]`;
 
     const separator = "═".repeat(46);
     return `${separator}\n${header}\n${separator}\n${content}`;
@@ -761,7 +1027,8 @@ export class MemoryStore {
     const limit = this.config.memoryCharLimit;
     const content = entries.join(ENTRY_DELIMITER);
     const current = content.length;
-    const pct = limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
+    const pct =
+      limit > 0 ? Math.min(100, Math.floor((current / limit) * 100)) : 0;
 
     const header = `PROJECT MEMORY: ${projectName} [${pct}% — ${current}/${limit} chars]`;
     const separator = "═".repeat(46);
@@ -779,14 +1046,23 @@ export class MemoryStore {
     return createHash("sha256").update(content).digest("hex");
   }
 
-  private async readFileState(filePath: string): Promise<{ entries: string[]; fingerprint: string; size: number }> {
+  private async readFileState(
+    filePath: string,
+  ): Promise<{ entries: string[]; fingerprint: string; size: number }> {
     try {
       const raw = await fs.readFile(filePath);
       const content = raw.toString("utf-8");
       const entries = content.trim()
-        ? content.split(ENTRY_DELIMITER).map((entry) => entry.trim()).filter(Boolean)
+        ? content
+            .split(ENTRY_DELIMITER)
+            .map((entry) => entry.trim())
+            .filter(Boolean)
         : [];
-      return { entries, fingerprint: this.fingerprint(raw), size: raw.byteLength };
+      return {
+        entries,
+        fingerprint: this.fingerprint(raw),
+        size: raw.byteLength,
+      };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return { entries: [], fingerprint: "missing", size: 0 };
@@ -795,7 +1071,9 @@ export class MemoryStore {
     }
   }
 
-  private async syncTargetFromDiskIfChanged(target: "memory" | "user" | "failure"): Promise<void> {
+  private async syncTargetFromDiskIfChanged(
+    target: "memory" | "user" | "failure",
+  ): Promise<void> {
     const filePath = await this.resolveStoragePath(target);
     const state = await this.readFileState(filePath);
     if (this.fileFingerprints[filePath] === state.fingerprint) return;
@@ -824,8 +1102,10 @@ export class MemoryStore {
         ...result,
         ...this.successResponse(target, result.message),
       };
-      if (result.evicted_entries) finalized.evicted_entries = result.evicted_entries;
-      if (result.evicted_count !== undefined) finalized.evicted_count = result.evicted_count;
+      if (result.evicted_entries)
+        finalized.evicted_entries = result.evicted_entries;
+      if (result.evicted_count !== undefined)
+        finalized.evicted_count = result.evicted_count;
       if (result.matches) finalized.matches = result.matches;
       if (result.entries) finalized.entries = result.entries;
     }
@@ -838,7 +1118,9 @@ export class MemoryStore {
     const warnings = [...(finalized.warnings ?? []), warning];
     return {
       ...finalized,
-      message: finalized.message ? `${finalized.message} Warning: ${warning}` : warning,
+      message: finalized.message
+        ? `${finalized.message} Warning: ${warning}`
+        : warning,
       warning,
       warnings,
     };
@@ -885,7 +1167,8 @@ export class MemoryStore {
           if (attempt >= MAX_EXTERNAL_WRITE_RETRIES) {
             return await this.finalizeTargetMutation(target, storagePath, {
               success: false,
-              error: "Memory file changed repeatedly during this update. No external changes were overwritten. If you edited the file manually, re-run the memory tool or /memory-sync-markdown after the file is stable.",
+              error:
+                "Memory file changed repeatedly during this update. No external changes were overwritten. If you edited the file manually, re-run the memory tool or /memory-sync-markdown after the file is stable.",
             });
           }
         }
@@ -899,7 +1182,9 @@ export class MemoryStore {
    * cross-device rename errors (EXDEV) when os.tmpdir() is on a different
    * drive than the memory directory (common on Windows).
    */
-  private async saveToDisk(target: "memory" | "user" | "failure"): Promise<void> {
+  private async saveToDisk(
+    target: "memory" | "user" | "failure",
+  ): Promise<void> {
     const filePath = await this.resolveStoragePath(target);
     const entries = this.entriesFor(target);
     const content = entries.length ? entries.join(ENTRY_DELIMITER) : "";
@@ -965,10 +1250,13 @@ export class MemoryStore {
           if (published) {
             try {
               await this.preserveConflictFile(tmpPath, filePath, "local");
-            } catch {
-            }
+            } catch {}
             try {
-              await this.rollbackPublishedFile(recoveryPath, filePath, publishedIdentity);
+              await this.rollbackPublishedFile(
+                recoveryPath,
+                filePath,
+                publishedIdentity,
+              );
             } catch (restorePublishedError) {
               rollbackError = restorePublishedError;
             }
@@ -980,15 +1268,21 @@ export class MemoryStore {
             }
           }
           if (rollbackError) throw rollbackError;
-          if ((error as NodeJS.ErrnoException).code === "EEXIST"
-            || error instanceof ExternalMemoryWriteConflict) {
+          if (
+            (error as NodeJS.ErrnoException).code === "EEXIST" ||
+            error instanceof ExternalMemoryWriteConflict
+          ) {
             throw new ExternalMemoryWriteConflict();
           }
           throw error;
         }
       }
 
-      try { await this.unlinkPublishedTempLink(tmpPath); } catch { /* ignore */ }
+      try {
+        await this.unlinkPublishedTempLink(tmpPath);
+      } catch {
+        /* ignore */
+      }
 
       // Re-read after publish. An external truncate/cp can land between the
       // link/rename and returning success; treat that as a write conflict so
@@ -1005,14 +1299,25 @@ export class MemoryStore {
       // individual source file can be larger than the entire recovery budget.
       await this.pruneRecoveryFiles(filePath);
     } catch (err) {
-      try { await fs.unlink(tmpPath); } catch { /* ignore */ }
+      try {
+        await fs.unlink(tmpPath);
+      } catch {
+        /* ignore */
+      }
       throw err;
     } finally {
-      try { await fs.rm(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  private async restoreDisplacedFile(displacedPath: string, filePath: string): Promise<void> {
+  private async restoreDisplacedFile(
+    displacedPath: string,
+    filePath: string,
+  ): Promise<void> {
     try {
       await fs.link(displacedPath, filePath);
     } catch (error) {
@@ -1020,7 +1325,9 @@ export class MemoryStore {
     }
   }
 
-  private async fileIdentity(filePath: string): Promise<{ dev: number; ino: number }> {
+  private async fileIdentity(
+    filePath: string,
+  ): Promise<{ dev: number; ino: number }> {
     const state = await fs.lstat(filePath);
     return { dev: state.dev, ino: state.ino };
   }
@@ -1069,11 +1376,19 @@ export class MemoryStore {
     );
   }
 
-  private async shouldReuseRecoverySnapshot(filePath: string): Promise<boolean> {
+  private async shouldReuseRecoverySnapshot(
+    filePath: string,
+  ): Promise<boolean> {
     const directory = path.dirname(filePath);
-    const escapedName = path.basename(filePath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const uuidPattern = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-    const recoveryPattern = new RegExp(`^\\.${escapedName}\\.recovery-\\d+-${uuidPattern}$`, "i");
+    const escapedName = path
+      .basename(filePath)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const uuidPattern =
+      "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+    const recoveryPattern = new RegExp(
+      `^\\.${escapedName}\\.recovery-\\d+-${uuidPattern}$`,
+      "i",
+    );
     try {
       const names = await fs.readdir(directory);
       const mtimes = await Promise.all(
@@ -1090,11 +1405,17 @@ export class MemoryStore {
       );
       let newestMtimeMs: number | null = null;
       for (const mtimeMs of mtimes) {
-        if (mtimeMs !== null && (newestMtimeMs === null || mtimeMs > newestMtimeMs)) {
+        if (
+          mtimeMs !== null &&
+          (newestMtimeMs === null || mtimeMs > newestMtimeMs)
+        ) {
           newestMtimeMs = mtimeMs;
         }
       }
-      return newestMtimeMs !== null && Date.now() - newestMtimeMs < RECOVERY_SNAPSHOT_MIN_INTERVAL_MS;
+      return (
+        newestMtimeMs !== null &&
+        Date.now() - newestMtimeMs < RECOVERY_SNAPSHOT_MIN_INTERVAL_MS
+      );
     } catch {
       return false;
     }
@@ -1111,12 +1432,24 @@ export class MemoryStore {
     await fs.unlink(tmpPath);
   }
 
-  private async pruneRecoveryFiles(filePath: string, upcomingBytes = 0): Promise<void> {
+  private async pruneRecoveryFiles(
+    filePath: string,
+    upcomingBytes = 0,
+  ): Promise<void> {
     const directory = path.dirname(filePath);
-    const escapedName = path.basename(filePath).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const uuidPattern = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-    const recoveryPattern = new RegExp(`^\\.${escapedName}\\.recovery-\\d+-${uuidPattern}$`, "i");
-    const retiredPattern = new RegExp(`^\\.${escapedName}\\.retired-\\d+-${uuidPattern}$`, "i");
+    const escapedName = path
+      .basename(filePath)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const uuidPattern =
+      "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+    const recoveryPattern = new RegExp(
+      `^\\.${escapedName}\\.recovery-\\d+-${uuidPattern}$`,
+      "i",
+    );
+    const retiredPattern = new RegExp(
+      `^\\.${escapedName}\\.retired-\\d+-${uuidPattern}$`,
+      "i",
+    );
     const conflictPattern = new RegExp(
       `^\\.${escapedName}\\.conflict-local-\\d+-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
       "i",
@@ -1125,15 +1458,17 @@ export class MemoryStore {
     try {
       const names = await fs.readdir(directory);
       const recoveryNames = names.filter((name) => recoveryPattern.test(name));
-      const recovery = await Promise.all(recoveryNames.map(async (name) => {
-        const recoveryPath = path.join(directory, name);
-        try {
-          const state = await fs.lstat(recoveryPath);
-          return state.isFile() ? { path: recoveryPath, state } : null;
-        } catch {
-          return null;
-        }
-      }));
+      const recovery = await Promise.all(
+        recoveryNames.map(async (name) => {
+          const recoveryPath = path.join(directory, name);
+          try {
+            const state = await fs.lstat(recoveryPath);
+            return state.isFile() ? { path: recoveryPath, state } : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
       const recoveryCandidates = recovery
         .filter((item): item is NonNullable<typeof item> => item !== null)
         .sort((left, right) => right.state.mtimeMs - left.state.mtimeMs);
@@ -1143,29 +1478,40 @@ export class MemoryStore {
         const withinGrace = item.state.mtimeMs >= activeCutoff;
         const withinCount = recoveryCount < Math.max(0, RECOVERY_MAX_COUNT - 1);
         // Reserve room for the snapshot this write will publish.
-        const recoveryByteLimit = Math.max(0, RECOVERY_MAX_BYTES - upcomingBytes);
-        const withinBytes = recoveryBytes + item.state.size <= recoveryByteLimit;
-        if ((withinGrace || recoveryCount === 0) && withinCount && withinBytes) {
+        const recoveryByteLimit = Math.max(
+          0,
+          RECOVERY_MAX_BYTES - upcomingBytes,
+        );
+        const withinBytes =
+          recoveryBytes + item.state.size <= recoveryByteLimit;
+        if (
+          (withinGrace || recoveryCount === 0) &&
+          withinCount &&
+          withinBytes
+        ) {
           recoveryCount++;
           recoveryBytes += item.state.size;
           continue;
         }
         try {
           await this.retireRecoveryFile(item.path, filePath);
-        } catch {
-        }
+        } catch {}
       }
 
-      const retiredNames = (await fs.readdir(directory)).filter((name) => retiredPattern.test(name));
-      const retired = await Promise.all(retiredNames.map(async (name) => {
-        const retiredPath = path.join(directory, name);
-        try {
-          const state = await fs.lstat(retiredPath);
-          return state.isFile() ? { path: retiredPath, state } : null;
-        } catch {
-          return null;
-        }
-      }));
+      const retiredNames = (await fs.readdir(directory)).filter((name) =>
+        retiredPattern.test(name),
+      );
+      const retired = await Promise.all(
+        retiredNames.map(async (name) => {
+          const retiredPath = path.join(directory, name);
+          try {
+            const state = await fs.lstat(retiredPath);
+            return state.isFile() ? { path: retiredPath, state } : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
       const maxAgeCutoff = Date.now() - RETIRED_RECOVERY_MAX_AGE_MS;
       const candidates = retired
         .filter((item): item is NonNullable<typeof item> => item !== null)
@@ -1175,25 +1521,32 @@ export class MemoryStore {
       for (const item of candidates) {
         const withinAge = item.state.mtimeMs >= maxAgeCutoff;
         const withinCount = retainedCount < RETIRED_RECOVERY_MAX_COUNT;
-        const withinBytes = retainedBytes + item.state.size <= RETIRED_RECOVERY_MAX_BYTES;
+        const withinBytes =
+          retainedBytes + item.state.size <= RETIRED_RECOVERY_MAX_BYTES;
         if (withinAge && withinCount && withinBytes) {
           retainedCount++;
           retainedBytes += item.state.size;
           continue;
         }
-        try { await fs.unlink(item.path); } catch {}
+        try {
+          await fs.unlink(item.path);
+        } catch {}
       }
 
-      const conflictNames = (await fs.readdir(directory)).filter((name) => conflictPattern.test(name));
-      const conflicts = await Promise.all(conflictNames.map(async (name) => {
-        const conflictPath = path.join(directory, name);
-        try {
-          const state = await fs.lstat(conflictPath);
-          return state.isFile() ? { path: conflictPath, state } : null;
-        } catch {
-          return null;
-        }
-      }));
+      const conflictNames = (await fs.readdir(directory)).filter((name) =>
+        conflictPattern.test(name),
+      );
+      const conflicts = await Promise.all(
+        conflictNames.map(async (name) => {
+          const conflictPath = path.join(directory, name);
+          try {
+            const state = await fs.lstat(conflictPath);
+            return state.isFile() ? { path: conflictPath, state } : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
       const graceCutoff = Date.now() - CONFLICT_ACTIVE_GRACE_MS;
       const conflictMaxAgeCutoff = Date.now() - CONFLICT_MAX_AGE_MS;
       const conflictCandidates = conflicts
@@ -1203,7 +1556,8 @@ export class MemoryStore {
       let conflictBytes = 0;
       for (const item of conflictCandidates) {
         const withinCount = conflictCount < CONFLICT_MAX_COUNT;
-        const withinBytes = conflictBytes + item.state.size <= CONFLICT_MAX_BYTES;
+        const withinBytes =
+          conflictBytes + item.state.size <= CONFLICT_MAX_BYTES;
         const withinGrace = item.state.mtimeMs >= graceCutoff;
         const withinAge = item.state.mtimeMs >= conflictMaxAgeCutoff;
         if ((withinGrace || withinAge) && withinCount && withinBytes) {
@@ -1211,13 +1565,17 @@ export class MemoryStore {
           conflictBytes += item.state.size;
           continue;
         }
-        try { await fs.unlink(item.path); } catch {}
+        try {
+          await fs.unlink(item.path);
+        } catch {}
       }
-    } catch {
-    }
+    } catch {}
   }
 
-  private async retireRecoveryFile(recoveryPath: string, filePath: string): Promise<void> {
+  private async retireRecoveryFile(
+    recoveryPath: string,
+    filePath: string,
+  ): Promise<void> {
     const retiredPath = this.retiredRecoveryPathFor(filePath);
     const snapshotPath = `${retiredPath}.tmp`;
     const snapshot = await fs.readFile(recoveryPath);
@@ -1232,7 +1590,11 @@ export class MemoryStore {
     await fs.unlink(recoveryPath);
   }
 
-  private async preserveConflictFile(sourcePath: string, filePath: string, kind: string): Promise<string> {
+  private async preserveConflictFile(
+    sourcePath: string,
+    filePath: string,
+    kind: string,
+  ): Promise<string> {
     const conflictPath = path.join(
       path.dirname(filePath),
       `.${path.basename(filePath)}.conflict-${kind}-${Date.now()}-${randomUUID()}`,

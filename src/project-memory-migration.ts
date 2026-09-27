@@ -14,7 +14,10 @@ function readEntries(filePath: string): string[] {
   if (!fs.existsSync(filePath)) return [];
   const raw = fs.readFileSync(filePath, "utf-8").trim();
   if (!raw) return [];
-  return raw.split(ENTRY_DELIMITER).map((entry) => entry.trim()).filter(Boolean);
+  return raw
+    .split(ENTRY_DELIMITER)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function writeEntries(filePath: string, entries: string[]): void {
@@ -22,12 +25,27 @@ function writeEntries(filePath: string, entries: string[]): void {
   fs.writeFileSync(filePath, entries.join(ENTRY_DELIMITER), "utf-8");
 }
 
-function isLegacyProjectDir(agentRoot: string, projectsMemoryDir: string, name: string): boolean {
-  if (name === "memory" || name === "pi-hermes-memory" || name === "skills" || name === projectsMemoryDir) return false;
+function isLegacyProjectDir(
+  agentRoot: string,
+  projectsMemoryDir: string,
+  name: string,
+): boolean {
+  if (
+    name === "memory" ||
+    name === "pi-hermes-memory" ||
+    name === "pi-eric-memory" ||
+    name === "skills" ||
+    name === projectsMemoryDir
+  )
+    return false;
   if (name.startsWith(".")) return false;
 
   const dir = path.join(agentRoot, name);
-  return fs.existsSync(dir) && fs.statSync(dir).isDirectory() && fs.existsSync(path.join(dir, MEMORY_FILE));
+  return (
+    fs.existsSync(dir) &&
+    fs.statSync(dir).isDirectory() &&
+    fs.existsSync(path.join(dir, MEMORY_FILE))
+  );
 }
 
 export function migrateLegacyProjectMemoryDirs(
@@ -85,7 +103,9 @@ export function migrateLegacyProjectMemoryDirs(
       writeEntries(targetFile, mergedEntries);
       result.merged++;
     } catch (err) {
-      result.warnings.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+      result.warnings.push(
+        `${name}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

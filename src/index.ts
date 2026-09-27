@@ -24,14 +24,33 @@
 
 import * as path from "node:path";
 import * as fs from "node:fs";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { MemoryStore } from "./store/memory-store.js";
 import { SkillStore } from "./store/skill-store.js";
 import { DatabaseManager } from "./store/db.js";
-import { indexSession, upsertSessionFileMetadata, pruneEphemeralReviewSessions, pruneOldSessions, retentionCutoffMs } from "./store/session-indexer.js";
+import {
+  indexSession,
+  upsertSessionFileMetadata,
+  pruneEphemeralReviewSessions,
+  pruneOldSessions,
+  retentionCutoffMs,
+} from "./store/session-indexer.js";
 import { runRecoveryMaintenance } from "./store/recovery-maintenance.js";
-import { scheduleSessionBackfill, joinSessionBackfill, waitForSessionBackfill, SESSION_BACKFILL_SHUTDOWN_TIMEOUT_MS, type SessionBackfillState } from "./handlers/session-backfill.js";
-import { scheduleLiveSessionIndex, waitForLiveSessionIndex, SESSION_LIVE_INDEX_SHUTDOWN_TIMEOUT_MS } from "./handlers/session-live-index.js";
+import {
+  scheduleSessionBackfill,
+  joinSessionBackfill,
+  waitForSessionBackfill,
+  SESSION_BACKFILL_SHUTDOWN_TIMEOUT_MS,
+  type SessionBackfillState,
+} from "./handlers/session-backfill.js";
+import {
+  scheduleLiveSessionIndex,
+  waitForLiveSessionIndex,
+  SESSION_LIVE_INDEX_SHUTDOWN_TIMEOUT_MS,
+} from "./handlers/session-live-index.js";
 import { parseSessionFile } from "./store/session-parser.js";
 import { registerMemoryTool } from "./tools/memory-tool.js";
 import { registerSkillTool } from "./tools/skill-tool.js";
@@ -40,16 +59,24 @@ import { registerMemorySearchTool } from "./tools/memory-search-tool.js";
 import { setupBackgroundReview } from "./handlers/background-review.js";
 import { setupSessionFlush } from "./handlers/session-flush.js";
 import { registerInsightsCommand } from "./handlers/insights.js";
-import { triggerConsolidation, registerConsolidateCommand } from "./handlers/auto-consolidate.js";
+import {
+  triggerConsolidation,
+  registerConsolidateCommand,
+} from "./handlers/auto-consolidate.js";
 import { setupCorrectionDetector } from "./handlers/correction-detector.js";
 import { registerSkillsCommand } from "./handlers/skills-command.js";
 import { registerInterviewCommand } from "./handlers/interview.js";
 import { registerSwitchProjectCommand } from "./handlers/switch-project.js";
 import { registerIndexSessionsCommand } from "./handlers/index-sessions.js";
 import { registerLearnMemoryCommand } from "./handlers/learn-memory.js";
-import { migrateThenSyncMarkdownMemories, registerSyncMarkdownMemoriesCommand } from "./handlers/sync-markdown-memories.js";
+import {
+  migrateThenSyncMarkdownMemories,
+  registerSyncMarkdownMemoriesCommand,
+} from "./handlers/sync-markdown-memories.js";
 import { registerPreviewContextCommand } from "./handlers/preview-context.js";
 import { registerStandingPinCommand } from "./handlers/standing-pin.js";
+import { registerCorrectionsCommand } from "./handlers/corrections-command.js";
+import { registerReflectionTools } from "./handlers/reflection-tools.js";
 import { StandingInstructions } from "./store/standing-instructions.js";
 import { STANDING_FILE } from "./constants.js";
 import { loadConfig } from "./config.js";
@@ -60,7 +87,11 @@ import { migrateLegacyProjectMemoryDirs } from "./project-memory-migration.js";
 import { AGENT_ROOT } from "./paths.js";
 import { isDatabaseMigrationPending } from "./extension-root-migration.js";
 import { measureLifecycle, measureLifecycleSync } from "./lifecycle-timing.js";
-import { createMemoryInitializer, withMemoryInitialization, type EnsureMemoryReady } from "./memory-initialization.js";
+import {
+  createMemoryInitializer,
+  withMemoryInitialization,
+  type EnsureMemoryReady,
+} from "./memory-initialization.js";
 
 export function resolveProjectSkillDiscovery(
   skillStore: SkillStore,
@@ -85,29 +116,36 @@ export function registerProjectSkillDiscoveryHandler(
   projectsMemoryDir: string | undefined,
 ): void {
   pi.on("resources_discover", async (event, _ctx) => {
-    return resolveProjectSkillDiscovery(skillStore, projectsMemoryDir, (event as { cwd?: string }).cwd);
+    return resolveProjectSkillDiscovery(
+      skillStore,
+      projectsMemoryDir,
+      (event as { cwd?: string }).cwd,
+    );
   });
 }
 
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
-  const lazy = config.lazyInitialization === true && config.memoryMode === "policy-only";
+  const lazy =
+    config.lazyInitialization === true && config.memoryMode === "policy-only";
   let sessionContext: ExtensionContext | undefined;
 
   const agentRoot = AGENT_ROOT;
-  const legacyGlobalDir = path.join(agentRoot, "memory");
-  const defaultGlobalDir = path.join(agentRoot, "pi-hermes-memory");
+  const legacyGlobalDir = path.join(agentRoot, "pi-hermes-memory");
+  const defaultGlobalDir = path.join(agentRoot, "pi-eric-memory");
 
   const configuredMemoryDir = config.memoryDir?.trim();
   const pointsToLegacyMemoryDir = configuredMemoryDir
     ? path.resolve(configuredMemoryDir) === path.resolve(legacyGlobalDir)
     : false;
 
-  const globalDir = !configuredMemoryDir || pointsToLegacyMemoryDir
-    ? defaultGlobalDir
-    : configuredMemoryDir;
+  const globalDir =
+    !configuredMemoryDir || pointsToLegacyMemoryDir
+      ? defaultGlobalDir
+      : configuredMemoryDir;
 
-  const shouldMigrateExtensionRoot = !configuredMemoryDir || pointsToLegacyMemoryDir;
+  const shouldMigrateExtensionRoot =
+    !configuredMemoryDir || pointsToLegacyMemoryDir;
   let persistenceInitialized = false;
 
   const store = new MemoryStore({ ...config, memoryDir: globalDir });
@@ -121,23 +159,36 @@ export default function (pi: ExtensionAPI) {
     projectSkillsDir: null,
     projectName: null,
     legacySkillsDir: path.join(legacyGlobalDir, "skills"),
-    migrationSentinelPath: path.join(globalDir, ".skills-migrated-to-extension-storage"),
+    migrationSentinelPath: path.join(
+      globalDir,
+      ".skills-migrated-to-extension-storage",
+    ),
   });
   const dbManager = new DatabaseManager(globalDir);
   let databaseClosed = false;
-  const backfillState: SessionBackfillState = { inProgress: false, promise: null };
+  const backfillState: SessionBackfillState = {
+    inProgress: false,
+    promise: null,
+  };
   dbManager.setQuickCheckOnOpen(config.quickCheckOnOpen ?? true);
   // No database may open before first-use migration has completed.
-  let databaseMigrationPending = (lazy && shouldMigrateExtensionRoot) || (shouldMigrateExtensionRoot
-    && isDatabaseMigrationPending(legacyGlobalDir, globalDir));
+  let databaseMigrationPending =
+    (lazy && shouldMigrateExtensionRoot) ||
+    (shouldMigrateExtensionRoot &&
+      isDatabaseMigrationPending(legacyGlobalDir, globalDir));
   dbManager.setOpenGuard(() => {
     if (databaseClosed) throw new Error("Memory session has shut down");
-    if (databaseMigrationPending) throw new Error("Legacy sessions.db migration is pending");
+    if (databaseMigrationPending)
+      throw new Error("Legacy sessions.db migration is pending");
   });
   const sessionsDir = path.join(agentRoot, "sessions");
 
   const refreshSkillProjectContext = (cwd?: string) => {
-    const resource = resolveProjectSkillDiscovery(skillStore, config.projectsMemoryDir, cwd);
+    const resource = resolveProjectSkillDiscovery(
+      skillStore,
+      config.projectsMemoryDir,
+      cwd,
+    );
     return {
       name: skillStore.getProjectName(),
       skillsDir: skillStore.getProjectSkillsDir(),
@@ -148,10 +199,13 @@ export default function (pi: ExtensionAPI) {
   // Keep project memory available for users upgrading from the old
   // ~/.pi/agent/<project>/ layout. This is non-destructive: legacy folders
   // remain in place while entries are copied/merged into projects-memory/.
-  if (!lazy) migrateLegacyProjectMemoryDirs(agentRoot, config.projectsMemoryDir);
+  if (!lazy)
+    migrateLegacyProjectMemoryDirs(agentRoot, config.projectsMemoryDir);
   // Project-scoped store: ~/.pi/agent/<projectsMemoryDir>/<project_name>/
   // Bound from session/tool ctx.cwd, never from factory process.cwd().
-  const createProjectStore = (projectInfo: ReturnType<typeof detectProject>): MemoryStore | null => {
+  const createProjectStore = (
+    projectInfo: ReturnType<typeof detectProject>,
+  ): MemoryStore | null => {
     if (!projectInfo.memoryDir) return null;
     return new MemoryStore({
       ...config,
@@ -165,7 +219,9 @@ export default function (pi: ExtensionAPI) {
   const projectStoreRef = () => projectStore;
   const projectNameRef = () => projectName;
   let configureProjectStore: (candidate: MemoryStore | null) => void = () => {};
-  let configureMemoryToolProjectStore: (candidate: MemoryStore | null) => void = () => {};
+  let configureMemoryToolProjectStore: (
+    candidate: MemoryStore | null,
+  ) => void = () => {};
   const bindProjectFromCwd = async (cwd?: string): Promise<void> => {
     if (!cwd) return;
     const nextProject = detectProject(config.projectsMemoryDir, cwd);
@@ -188,95 +244,119 @@ export default function (pi: ExtensionAPI) {
   };
   // Never written by review, consolidation or the correction detector — see
   // store/standing-instructions.ts for why provenance has to be structural.
-  const standingStore = config.standingInstructionsEnabled !== false
-    ? new StandingInstructions(path.join(globalDir, STANDING_FILE), undefined, undefined,
-        shouldMigrateExtensionRoot ? path.join(legacyGlobalDir, STANDING_FILE) : undefined)
-    : null;
+  const standingStore =
+    config.standingInstructionsEnabled !== false
+      ? new StandingInstructions(
+          path.join(globalDir, STANDING_FILE),
+          undefined,
+          undefined,
+          shouldMigrateExtensionRoot
+            ? path.join(legacyGlobalDir, STANDING_FILE)
+            : undefined,
+        )
+      : null;
 
-  const initialization = createMemoryInitializer(async () => {
-    const timingPrefix = lazy ? "memory-init" : "session-start";
-    if (lazy) migrateLegacyProjectMemoryDirs(agentRoot, config.projectsMemoryDir);
-    if (!persistenceInitialized) {
-      try {
-        await measureLifecycle(`${timingPrefix}.persistence-sync`, async () => {
-          await migrateThenSyncMarkdownMemories(
-            dbManager,
-            shouldMigrateExtensionRoot ? legacyGlobalDir : null,
-            globalDir,
-            config.projectsMemoryDir,
-            agentRoot,
-            {
-              onMigrationSucceeded: () => {
-                databaseMigrationPending = false;
-              },
+  const initialization = createMemoryInitializer(
+    async () => {
+      const timingPrefix = lazy ? "memory-init" : "session-start";
+      if (lazy)
+        migrateLegacyProjectMemoryDirs(agentRoot, config.projectsMemoryDir);
+      if (!persistenceInitialized) {
+        try {
+          await measureLifecycle(
+            `${timingPrefix}.persistence-sync`,
+            async () => {
+              await migrateThenSyncMarkdownMemories(
+                dbManager,
+                shouldMigrateExtensionRoot ? legacyGlobalDir : null,
+                globalDir,
+                config.projectsMemoryDir,
+                agentRoot,
+                {
+                  onMigrationSucceeded: () => {
+                    databaseMigrationPending = false;
+                  },
+                },
+              );
             },
           );
-        });
-        persistenceInitialized = true;
-      } catch (error) {
-        if (lazy) throw error;
-        // Best-effort only: migration or SQLite backfill must not block startup.
-      }
-    }
-
-    await measureLifecycle(`${timingPrefix}.load`, async () => {
-      await store.loadFromDisk();
-    });
-
-    if (persistenceInitialized) {
-      try {
-        pruneEphemeralReviewSessions(dbManager);
-      } catch (err) {
-        console.warn(`⚠️ Ephemeral session cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      // Prune sessions older than the configured retention window to bound the
-      // size of the session index database (see #183). Runs before
-      // scheduleSessionBackfill so pruned sessions are never re-indexed by a
-      // backfill started in the same startup.
-      if (config.sessionRetentionDays && config.sessionRetentionDays > 0) {
-        try {
-          const pruneResult = pruneOldSessions(dbManager, config.sessionRetentionDays);
-          if (pruneResult.sessionsRemoved > 0) {
-            console.info(
-              `🧠 Pruned ${pruneResult.sessionsRemoved} old session(s) (> ${config.sessionRetentionDays} days old)`,
-            );
-          }
-        } catch (err) {
-          console.warn(`⚠️ Session pruning failed: ${err instanceof Error ? err.message : String(err)}`);
+          persistenceInitialized = true;
+        } catch (error) {
+          if (lazy) throw error;
+          // Best-effort only: migration or SQLite backfill must not block startup.
         }
       }
-      try {
-        await runRecoveryMaintenance({ config, globalDir });
-      } catch (err) {
-        console.warn(`⚠️ Snapshot retention sweep failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      scheduleSessionBackfill(dbManager, sessionsDir, {
-        state: backfillState,
-        notify: (message, level) => {
-          const ui = sessionContext?.ui;
-          if (ui?.notify) {
-            ui.notify(message, level);
-          } else if (level === "error" || level === "warning") {
-            console.warn(message);
-          } else {
-            console.info(message);
-          }
-        },
-        // Exclude files older than the retention cutoff so sessions pruned by
-        // retention are never re-indexed and never schedule another backfill.
-        retentionCutoffMs: retentionCutoffMs(config.sessionRetentionDays),
-      });
-    }
-  }, async (ctx) => {
-    try {
-      await bindProjectFromCwd(ctx.cwd);
-    } finally {
-      // Even a failed project bind must not leave backfill running past close.
-      if (lazy) await joinSessionBackfill(backfillState);
-    }
-  });
 
-  const ensureMemoryReady: EnsureMemoryReady = (ctx, signal) => initialization.ensure(ctx, signal);
+      await measureLifecycle(`${timingPrefix}.load`, async () => {
+        await store.loadFromDisk();
+      });
+
+      if (persistenceInitialized) {
+        try {
+          pruneEphemeralReviewSessions(dbManager);
+        } catch (err) {
+          console.warn(
+            `⚠️ Ephemeral session cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        // Prune sessions older than the configured retention window to bound the
+        // size of the session index database (see #183). Runs before
+        // scheduleSessionBackfill so pruned sessions are never re-indexed by a
+        // backfill started in the same startup.
+        if (config.sessionRetentionDays && config.sessionRetentionDays > 0) {
+          try {
+            const pruneResult = pruneOldSessions(
+              dbManager,
+              config.sessionRetentionDays,
+            );
+            if (pruneResult.sessionsRemoved > 0) {
+              console.info(
+                `🧠 Pruned ${pruneResult.sessionsRemoved} old session(s) (> ${config.sessionRetentionDays} days old)`,
+              );
+            }
+          } catch (err) {
+            console.warn(
+              `⚠️ Session pruning failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
+        try {
+          await runRecoveryMaintenance({ config, globalDir });
+        } catch (err) {
+          console.warn(
+            `⚠️ Snapshot retention sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        scheduleSessionBackfill(dbManager, sessionsDir, {
+          state: backfillState,
+          notify: (message, level) => {
+            const ui = sessionContext?.ui;
+            if (ui?.notify) {
+              ui.notify(message, level);
+            } else if (level === "error" || level === "warning") {
+              console.warn(message);
+            } else {
+              console.info(message);
+            }
+          },
+          // Exclude files older than the retention cutoff so sessions pruned by
+          // retention are never re-indexed and never schedule another backfill.
+          retentionCutoffMs: retentionCutoffMs(config.sessionRetentionDays),
+        });
+      }
+    },
+    async (ctx) => {
+      try {
+        await bindProjectFromCwd(ctx.cwd);
+      } finally {
+        // Even a failed project bind must not leave backfill running past close.
+        if (lazy) await joinSessionBackfill(backfillState);
+      }
+    },
+  );
+
+  const ensureMemoryReady: EnsureMemoryReady = (ctx, signal) =>
+    initialization.ensure(ctx, signal);
   const memoryPi = withMemoryInitialization(pi, initialization);
 
   // Skills and pinned instructions must be available even without a lookup.
@@ -290,11 +370,21 @@ export default function (pi: ExtensionAPI) {
     await skillStore.ensureDiscoveredRoots();
   });
 
-  registerProjectSkillDiscoveryHandler(pi, skillStore, config.projectsMemoryDir);
+  registerProjectSkillDiscoveryHandler(
+    pi,
+    skillStore,
+    config.projectsMemoryDir,
+  );
 
   // ── 2. Inject memory policy by default; legacy mode keeps full frozen memory blocks ──
   pi.on("before_agent_start", async (event, _ctx) => {
-    const promptContext = await buildPromptContext(config, store, projectStoreRef(), projectNameRef(), standingStore);
+    const promptContext = await buildPromptContext(
+      config,
+      store,
+      projectStoreRef(),
+      projectNameRef(),
+      standingStore,
+    );
 
     if (promptContext) {
       return {
@@ -304,7 +394,14 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ── 3. Register action-specific memory write tools with SQLite sync ──
-  configureMemoryToolProjectStore = registerMemoryTool(memoryPi, store, projectStoreRef, dbManager, projectNameRef, bindProjectFromCwd);
+  configureMemoryToolProjectStore = registerMemoryTool(
+    memoryPi,
+    store,
+    projectStoreRef,
+    dbManager,
+    projectNameRef,
+    bindProjectFromCwd,
+  );
 
   // ── 4. Register the skill tool ──
   registerSkillTool(pi, skillStore);
@@ -317,7 +414,15 @@ export default function (pi: ExtensionAPI) {
   });
 
   // ── 6. Setup session-end flush ──
-  setupSessionFlush(pi, store, projectStoreRef, config, dbManager, projectNameRef, { ensureMemoryReady });
+  setupSessionFlush(
+    pi,
+    store,
+    projectStoreRef,
+    config,
+    dbManager,
+    projectNameRef,
+    { ensureMemoryReady },
+  );
 
   // ── 7. Setup auto-consolidation (inject consolidator into stores) ──
   // Keep the failure in the tool result regardless; session-console logging is
@@ -338,25 +443,57 @@ export default function (pi: ExtensionAPI) {
       config,
     );
     if (result.deferred) {
-      console.info(`⏳ Auto-consolidation for '${toolTarget}' deferred: ${result.error ?? "another session holds the consolidation lock"}`);
-    } else if (shouldWarnAutoConsolidationFailure(config.autoConsolidationWarnOnFailure, result.consolidated)) {
-      console.warn(`⚠️ Auto-consolidation failed for '${toolTarget}': ${result.error ?? "no reason reported"}`);
+      console.info(
+        `⏳ Auto-consolidation for '${toolTarget}' deferred: ${result.error ?? "another session holds the consolidation lock"}`,
+      );
+    } else if (
+      shouldWarnAutoConsolidationFailure(
+        config.autoConsolidationWarnOnFailure,
+        result.consolidated,
+      )
+    ) {
+      console.warn(
+        `⚠️ Auto-consolidation failed for '${toolTarget}': ${result.error ?? "no reason reported"}`,
+      );
     }
     return result;
   };
 
-  store.setConsolidator((target, signal) => runAutoConsolidation(target, store, target, signal));
+  store.setConsolidator((target, signal) =>
+    runAutoConsolidation(target, store, target, signal),
+  );
   configureProjectStore = (candidate) => {
     if (!candidate) return;
     candidate.setConsolidator((target, signal) =>
-      runAutoConsolidation(target, candidate, target === "memory" ? "project" : target, signal),
+      runAutoConsolidation(
+        target,
+        candidate,
+        target === "memory" ? "project" : target,
+        signal,
+      ),
     );
   };
   configureProjectStore(projectStore);
-  registerConsolidateCommand(memoryPi, store, config.consolidationTimeoutMs, projectStoreRef, projectNameRef, config, dbManager);
+  registerConsolidateCommand(
+    memoryPi,
+    store,
+    config.consolidationTimeoutMs,
+    projectStoreRef,
+    projectNameRef,
+    config,
+    dbManager,
+  );
 
   // ── 8. Setup correction detection ──
-  setupCorrectionDetector(pi, store, projectStoreRef, config, dbManager, projectNameRef, { ensureMemoryReady });
+  setupCorrectionDetector(
+    pi,
+    store,
+    projectStoreRef,
+    config,
+    dbManager,
+    projectNameRef,
+    { ensureMemoryReady },
+  );
 
   // ── 9. Register commands ──
   registerInsightsCommand(memoryPi, store, projectStoreRef, projectNameRef);
@@ -364,22 +501,43 @@ export default function (pi: ExtensionAPI) {
   registerInterviewCommand(memoryPi, store);
   registerSwitchProjectCommand(pi, config);
   registerLearnMemoryCommand(pi);
-  registerSyncMarkdownMemoriesCommand(memoryPi, dbManager, globalDir, config.projectsMemoryDir, agentRoot);
-  registerPreviewContextCommand(lazy ? pi : memoryPi, store, projectStoreRef, projectNameRef, config, standingStore);
+  registerSyncMarkdownMemoriesCommand(
+    memoryPi,
+    dbManager,
+    globalDir,
+    config.projectsMemoryDir,
+    agentRoot,
+  );
+  registerPreviewContextCommand(
+    lazy ? pi : memoryPi,
+    store,
+    projectStoreRef,
+    projectNameRef,
+    config,
+    standingStore,
+  );
   if (standingStore) registerStandingPinCommand(pi, standingStore);
+  registerCorrectionsCommand(memoryPi, dbManager);
+  registerReflectionTools(memoryPi, dbManager);
 
   // ── 10. Live session indexing ──
   pi.on("message_end", async (_event, ctx) => {
     // Cold lazy sessions remain in Pi's JSONL files and are backfilled on use.
     if (lazy && !initialization.isReady()) return;
     scheduleLiveSessionIndex(dbManager, ctx.sessionManager, {
-      onError: (err) => console.warn(`⚠️ Live session indexing failed: ${err instanceof Error ? err.message : String(err)}`),
+      onError: (err) =>
+        console.warn(
+          `⚠️ Live session indexing failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
     });
   });
 
   // ── 11. SQLite session search + extended memory ──
-  registerSessionSearchTool(config.sessionSearch?.variant === "anchors" ? pi : memoryPi,
-    dbManager, config.sessionSearch ?? { variant: "legacy" });
+  registerSessionSearchTool(
+    config.sessionSearch?.variant === "anchors" ? pi : memoryPi,
+    dbManager,
+    config.sessionSearch ?? { variant: "legacy" },
+  );
   registerMemorySearchTool(memoryPi, dbManager);
   registerIndexSessionsCommand(memoryPi, config);
 
@@ -422,17 +580,26 @@ export default function (pi: ExtensionAPI) {
       // Silent fail — don't block shutdown
     } finally {
       try {
-        await measureLifecycle("shutdown.index-waits", () => Promise.all([
-          waitForSessionBackfill(SESSION_BACKFILL_SHUTDOWN_TIMEOUT_MS, backfillState),
-          waitForLiveSessionIndex(SESSION_LIVE_INDEX_SHUTDOWN_TIMEOUT_MS),
-        ]));
+        await measureLifecycle("shutdown.index-waits", () =>
+          Promise.all([
+            waitForSessionBackfill(
+              SESSION_BACKFILL_SHUTDOWN_TIMEOUT_MS,
+              backfillState,
+            ),
+            waitForLiveSessionIndex(SESSION_LIVE_INDEX_SHUTDOWN_TIMEOUT_MS),
+          ]),
+        );
       } catch {
         // Best effort only — shutdown should not be held up by indexing errors.
       }
       try {
         databaseClosed = true;
-        measureLifecycleSync("shutdown.database-close", () => dbManager.close());
-      } catch { /* best effort — never block shutdown */ }
+        measureLifecycleSync("shutdown.database-close", () =>
+          dbManager.close(),
+        );
+      } catch {
+        /* best effort — never block shutdown */
+      }
     }
   });
 }

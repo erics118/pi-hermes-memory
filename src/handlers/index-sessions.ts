@@ -2,46 +2,70 @@
  * Index sessions command — /memory-index-sessions imports past sessions into SQLite.
  */
 
-import path from 'node:path';
-import fs from 'node:fs';
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { DatabaseManager } from '../store/db.js';
-import { indexAllSessions, getSessionStats, retentionCutoffMs } from '../store/session-indexer.js';
-import type { MemoryConfig } from '../types.js';
-import { AGENT_ROOT } from '../paths.js';
+import path from "node:path";
+import fs from "node:fs";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
+import { DatabaseManager } from "../store/db.js";
+import {
+  indexAllSessions,
+  getSessionStats,
+  retentionCutoffMs,
+} from "../store/session-indexer.js";
+import type { MemoryConfig } from "../types.js";
+import { AGENT_ROOT } from "../paths.js";
 
-const SESSIONS_DIR = process.env.PI_CODING_AGENT_SESSION_DIR || path.join(AGENT_ROOT, 'sessions');
+const SESSIONS_DIR =
+  process.env.PI_CODING_AGENT_SESSION_DIR || path.join(AGENT_ROOT, "sessions");
 
-export function registerIndexSessionsCommand(pi: ExtensionAPI, config: MemoryConfig): void {
+export function registerIndexSessionsCommand(
+  pi: ExtensionAPI,
+  config: MemoryConfig,
+): void {
   pi.registerCommand("memory-index-sessions", {
     description: "Import past Pi sessions into the search database",
     handler: async (_args, ctx: ExtensionCommandContext) => {
       // Show initial progress
-      ctx.ui.notify('🔍 Scanning session directories...', 'info');
+      ctx.ui.notify("🔍 Scanning session directories...", "info");
 
       try {
         // Count sessions first for progress display
         let totalFiles = 0;
         let projectDirs: string[] = [];
         if (fs.existsSync(SESSIONS_DIR)) {
-          projectDirs = fs.readdirSync(SESSIONS_DIR)
-            .filter(d => fs.statSync(path.join(SESSIONS_DIR, d)).isDirectory());
+          projectDirs = fs
+            .readdirSync(SESSIONS_DIR)
+            .filter((d) =>
+              fs.statSync(path.join(SESSIONS_DIR, d)).isDirectory(),
+            );
           for (const dir of projectDirs) {
-            const files = fs.readdirSync(path.join(SESSIONS_DIR, dir))
-              .filter(f => f.endsWith('.jsonl'));
+            const files = fs
+              .readdirSync(path.join(SESSIONS_DIR, dir))
+              .filter((f) => f.endsWith(".jsonl"));
             totalFiles += files.length;
           }
         }
 
-        ctx.ui.notify(`📁 Found ${totalFiles} session files across ${projectDirs.length} projects\n⏳ Indexing...`, 'info');
+        ctx.ui.notify(
+          `📁 Found ${totalFiles} session files across ${projectDirs.length} projects\n⏳ Indexing...`,
+          "info",
+        );
 
-        const memoryDir = path.join(AGENT_ROOT, 'pi-hermes-memory');
+        const memoryDir =
+          config.memoryDir?.trim() || path.join(AGENT_ROOT, "pi-eric-memory");
         const dbManager = new DatabaseManager(memoryDir);
 
         try {
           // Retention is honored here too: a manual reindex must not re-add the
           // expired sessions the auto pruning just deleted.
-          const result = indexAllSessions(dbManager, SESSIONS_DIR, undefined, retentionCutoffMs(config.sessionRetentionDays));
+          const result = indexAllSessions(
+            dbManager,
+            SESSIONS_DIR,
+            undefined,
+            retentionCutoffMs(config.sessionRetentionDays),
+          );
           const stats = getSessionStats(dbManager);
 
           let output = `\n✅ Session indexing complete!\n\n`;
@@ -79,12 +103,15 @@ export function registerIndexSessionsCommand(pi: ExtensionAPI, config: MemoryCon
 
           output += `\n💡 Use the session_search tool to search across indexed sessions.`;
 
-          ctx.ui.notify(output, 'info');
+          ctx.ui.notify(output, "info");
         } finally {
           dbManager.close();
         }
       } catch (err) {
-        ctx.ui.notify(`❌ Session indexing failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        ctx.ui.notify(
+          `❌ Session indexing failed: ${err instanceof Error ? err.message : String(err)}`,
+          "error",
+        );
       }
     },
   });

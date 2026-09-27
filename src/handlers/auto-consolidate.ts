@@ -13,12 +13,20 @@
  * The subprocess child process modifies files on disk, so the parent MUST
  * reload from disk after a subprocess-based consolidation completes.
  */
-import { resolveProjectName, resolveProjectStore, type ProjectNameRef, type ProjectStoreRef } from "../project-context.js";
+import {
+  resolveProjectName,
+  resolveProjectStore,
+  type ProjectNameRef,
+  type ProjectStoreRef,
+} from "../project-context.js";
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { MemoryStore } from "../store/memory-store.js";
 import { DatabaseManager } from "../store/db.js";
 import {
@@ -30,12 +38,18 @@ import {
 import type { ConsolidationResult, MemoryConfig } from "../types.js";
 import { AGENT_ROOT } from "../paths.js";
 import { execChildPrompt } from "./pi-child-process.js";
-import { runDirectMemoryCompletion, usesDirectTransport } from "./review-memory-ops.js";
+import {
+  runDirectMemoryCompletion,
+  usesDirectTransport,
+} from "./review-memory-ops.js";
 import { AtomicLockCoordinator } from "../store/atomic-lock-coordinator.js";
 
 type MemoryTarget = "memory" | "user" | "failure";
 type ToolMemoryTarget = MemoryTarget | "project";
-type ConsolidationLlmConfig = Pick<MemoryConfig, "llmModelOverride" | "llmThinkingOverride" | "reviewTransport">;
+type ConsolidationLlmConfig = Pick<
+  MemoryConfig,
+  "llmModelOverride" | "llmThinkingOverride" | "reviewTransport"
+>;
 
 // staleMs is deliberately decoupled from the consolidation timeout. The holder
 // beats every CONSOLIDATION_LOCK_HEARTBEAT_MS while its child runs, so a
@@ -64,22 +78,32 @@ interface ConsolidationLockAttempt {
 }
 
 function consolidationLockRoot(): string {
-  return process.env[CONSOLIDATION_LOCK_ENV]?.trim()
-    || path.join(AGENT_ROOT, "pi-hermes-memory", ".consolidation-locks");
+  return (
+    process.env[CONSOLIDATION_LOCK_ENV]?.trim() ||
+    path.join(AGENT_ROOT, "pi-eric-memory", ".consolidation-locks")
+  );
 }
 
 function sanitizeLockPart(value: string): string {
   return value.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "unknown";
 }
 
-function consolidationLockKey(target: MemoryTarget, toolTarget: ToolMemoryTarget, storageIdentity: string): string {
-  const storageHash = createHash("sha256").update(storageIdentity).digest("hex");
+function consolidationLockKey(
+  target: MemoryTarget,
+  toolTarget: ToolMemoryTarget,
+  storageIdentity: string,
+): string {
+  const storageHash = createHash("sha256")
+    .update(storageIdentity)
+    .digest("hex");
   return `${sanitizeLockPart(toolTarget)}:${sanitizeLockPart(target)}:${storageHash}`;
 }
 
 function consolidationLockWaitMs(): number {
   const configured = Number(process.env[CONSOLIDATION_LOCK_WAIT_ENV]);
-  return Number.isFinite(configured) && configured >= 0 ? configured : CONSOLIDATION_LOCK_WAIT_MS;
+  return Number.isFinite(configured) && configured >= 0
+    ? configured
+    : CONSOLIDATION_LOCK_WAIT_MS;
 }
 
 async function acquireConsolidationLock(
@@ -90,7 +114,9 @@ async function acquireConsolidationLock(
   const storageIdentity = await store.getStorageIdentity(target);
   const root = consolidationLockRoot();
   await fs.mkdir(root, { recursive: true });
-  const coordinator = AtomicLockCoordinator.shared(path.join(root, "locks.sqlite"));
+  const coordinator = AtomicLockCoordinator.shared(
+    path.join(root, "locks.sqlite"),
+  );
   const key = consolidationLockKey(target, toolTarget, storageIdentity);
   const lockOptions = { staleMs: CONSOLIDATION_LOCK_STALE_MS };
 
@@ -102,7 +128,9 @@ async function acquireConsolidationLock(
     while (!lease && Date.now() < deadline) {
       // Same shape as acquireMarkdownMutationLock; Promise.withResolvers would
       // need an ES2024 lib this project does not target.
-      await new Promise((resolve) => setTimeout(resolve, CONSOLIDATION_LOCK_POLL_MS));
+      await new Promise((resolve) =>
+        setTimeout(resolve, CONSOLIDATION_LOCK_POLL_MS),
+      );
       lease = coordinator.tryAcquire(key, lockOptions);
     }
   }
@@ -139,7 +167,10 @@ function entriesForTarget(store: MemoryStore, target: MemoryTarget): string[] {
   return store.getMemoryEntries();
 }
 
-function labelForTarget(target: MemoryTarget, toolTarget: ToolMemoryTarget): string {
+function labelForTarget(
+  target: MemoryTarget,
+  toolTarget: ToolMemoryTarget,
+): string {
   if (toolTarget === "project") return "Project Memory";
   if (target === "user") return "User Profile";
   if (target === "failure") return "Failure Memory";
@@ -151,7 +182,8 @@ function describeConsolidationFailure(
   timeoutMs: number,
 ): string {
   const stderr = result.stderr?.trim();
-  const terminated = result.killed || result.code === 124 || result.code === 143;
+  const terminated =
+    result.killed || result.code === 124 || result.code === 143;
 
   if (terminated) {
     return `Consolidation subprocess was terminated (likely timeout or cancellation). Timeout: ${timeoutMs}ms. Raise consolidationTimeoutMs if consolidation legitimately needs longer.`;
@@ -253,8 +285,9 @@ export async function triggerConsolidation(
       return {
         consolidated: false,
         deferred: true,
-        error: `Consolidation already in progress for target '${toolTarget}' in another session`
-          + ` (waited ${attempt.waitedMs}ms). Nothing was consolidated here — retry shortly.`,
+        error:
+          `Consolidation already in progress for target '${toolTarget}' in another session` +
+          ` (waited ${attempt.waitedMs}ms). Nothing was consolidated here — retry shortly.`,
       };
     }
 
@@ -276,11 +309,16 @@ export async function triggerConsolidation(
       }
     }
 
-    const result = await execChildPrompt(pi, buildConsolidationPrompt(target, toolTarget, promptEntries), llmConfig, {
-      signal,
-      timeoutMs,
-      retryWithoutOverrides: true,
-    }) as { code: number; stdout?: string; stderr?: string; killed?: boolean };
+    const result = (await execChildPrompt(
+      pi,
+      buildConsolidationPrompt(target, toolTarget, promptEntries),
+      llmConfig,
+      {
+        signal,
+        timeoutMs,
+        retryWithoutOverrides: true,
+      },
+    )) as { code: number; stdout?: string; stderr?: string; killed?: boolean };
 
     if (result.code === 0) {
       return { consolidated: true };
@@ -289,7 +327,7 @@ export async function triggerConsolidation(
       consolidated: false,
       error: describeConsolidationFailure(result, timeoutMs),
     };
-} catch (err) {
+  } catch (err) {
     const message = String(err);
     if (message.includes("extension ctx is stale")) {
       // Session replaced/reloaded while consolidation was running. The new
@@ -299,7 +337,8 @@ export async function triggerConsolidation(
       return {
         consolidated: false,
         deferred: true,
-        error: "session replaced or reloaded during consolidation — will consolidate on next write",
+        error:
+          "session replaced or reloaded during consolidation — will consolidate on next write",
       };
     }
     return {
@@ -308,7 +347,11 @@ export async function triggerConsolidation(
     };
   } finally {
     if (lock) {
-      try { await lock.release(); } catch { /* best-effort cleanup */ }
+      try {
+        await lock.release();
+      } catch {
+        /* best-effort cleanup */
+      }
     }
   }
 }
@@ -371,10 +414,7 @@ export function registerConsolidateCommand(
         }
 
         try {
-          ctx.ui.notify(
-            `⏳ Consolidating ${item.label}...`,
-            "info",
-          );
+          ctx.ui.notify(`⏳ Consolidating ${item.label}...`, "info");
         } catch {
           // Best-effort progress feedback only.
         }

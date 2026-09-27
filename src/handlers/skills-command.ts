@@ -5,7 +5,11 @@
 import { createHash } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import { SkillStore } from "../store/skill-store.js";
 import type { SkillIndex, SkillResult, SkillScope } from "../types.js";
 import {
@@ -106,7 +110,9 @@ function cloneFilters(filters: SkillCategoryFilters): SkillCategoryFilters {
   };
 }
 
-function ensureValidFilters(filters: SkillCategoryFilters): SkillCategoryFilters {
+function ensureValidFilters(
+  filters: SkillCategoryFilters,
+): SkillCategoryFilters {
   if (filters.global || filters.project || filters.external) return filters;
   return { ...DEFAULT_SKILL_FILTERS };
 }
@@ -129,7 +135,9 @@ export function formatSkillPath(inputPath: string): string {
   const absolutePath = path.resolve(inputPath);
   const home = os.homedir();
   const relative = path.relative(home, absolutePath);
-  const underHome = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  const underHome =
+    relative === "" ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative));
 
   if (!underHome) return absolutePath;
   if (relative === "") return "~";
@@ -141,15 +149,22 @@ function categoryForScope(scope: SkillScope): SkillRowCategory {
 }
 
 function createExternalSkillId(name: string, filePath: string): string {
-  const safeName = (name || "skill")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "skill";
-  const hash = createHash("sha1").update(`${name}|${filePath}`).digest("hex").slice(0, 10);
+  const safeName =
+    (name || "skill")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "skill";
+  const hash = createHash("sha1")
+    .update(`${name}|${filePath}`)
+    .digest("hex")
+    .slice(0, 10);
   return `external:${safeName}:${hash}`;
 }
 
-function matchesCategoryFilter(row: SkillModalRow, filters: SkillCategoryFilters): boolean {
+function matchesCategoryFilter(
+  row: SkillModalRow,
+  filters: SkillCategoryFilters,
+): boolean {
   if (row.category === "G") return filters.global;
   if (row.category === "P") return filters.project;
   return filters.external;
@@ -192,15 +207,19 @@ function nextSortMode(sortMode: SkillSortMode): SkillSortMode {
   }
 }
 
-function compareSkillRows(a: SkillModalRow, b: SkillModalRow, sortMode: SkillSortMode): number {
+function compareSkillRows(
+  a: SkillModalRow,
+  b: SkillModalRow,
+  sortMode: SkillSortMode,
+): number {
   if (sortMode === "name") {
     const byName = a.displayName.localeCompare(b.displayName);
     if (byName !== 0) return byName;
     return categoryOrder(a.category) - categoryOrder(b.category);
   }
 
-  const primaryA = sortMode === "updated" ? recencyValue(a) : (a.created || "");
-  const primaryB = sortMode === "updated" ? recencyValue(b) : (b.created || "");
+  const primaryA = sortMode === "updated" ? recencyValue(a) : a.created || "";
+  const primaryB = sortMode === "updated" ? recencyValue(b) : b.created || "";
   if (primaryA || primaryB) {
     if (!primaryA) return 1;
     if (!primaryB) return -1;
@@ -230,7 +249,9 @@ function compareSkillRows(a: SkillModalRow, b: SkillModalRow, sortMode: SkillSor
   return a.displayName.localeCompare(b.displayName);
 }
 
-export function collectLoadedSkillsFromCommands(commands: SkillCommandInfo[]): LoadedSkillRow[] {
+export function collectLoadedSkillsFromCommands(
+  commands: SkillCommandInfo[],
+): LoadedSkillRow[] {
   const loaded: LoadedSkillRow[] = [];
 
   for (const command of commands) {
@@ -241,8 +262,12 @@ export function collectLoadedSkillsFromCommands(commands: SkillCommandInfo[]): L
     const commandName = getStringField(command.name)?.trim();
     if (!commandName) continue;
 
-    const sourceInfo = isRecord(command.sourceInfo) ? command.sourceInfo : undefined;
-    const sourcePath = sourceInfo ? getStringField(sourceInfo.path)?.trim() : undefined;
+    const sourceInfo = isRecord(command.sourceInfo)
+      ? command.sourceInfo
+      : undefined;
+    const sourcePath = sourceInfo
+      ? getStringField(sourceInfo.path)?.trim()
+      : undefined;
     if (!sourcePath) continue;
 
     const rawName = commandName.startsWith("skill:")
@@ -266,7 +291,10 @@ export function collectLoadedSkillsFromCommands(commands: SkillCommandInfo[]): L
   return loaded.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
-export function formatSkillsList(rows: SkillModalRow[], projectName: string | null): string {
+export function formatSkillsList(
+  rows: SkillModalRow[],
+  projectName: string | null,
+): string {
   const globalSkills = rows.filter((row) => row.category === "G");
   const projectSkills = rows.filter((row) => row.category === "P");
   const externalSkills = rows.filter((row) => row.category === "E");
@@ -323,7 +351,10 @@ export function formatSkillsList(rows: SkillModalRow[], projectName: string | nu
   return lines.join("\n");
 }
 
-export function buildSkillRows(skills: SkillIndex[], selectedSkillIds = new Set<string>()): SkillModalRow[] {
+export function buildSkillRows(
+  skills: SkillIndex[],
+  selectedSkillIds = new Set<string>(),
+): SkillModalRow[] {
   return skills.map((skill) => {
     const displayName = skill.displayName || skill.name;
     const displayPath = formatSkillPath(skill.path);
@@ -341,7 +372,8 @@ export function buildSkillRows(skills: SkillIndex[], selectedSkillIds = new Set<
       updated: skill.updated,
       projectName: skill.projectName,
       selected: selectedSkillIds.has(skill.skillId),
-      searchText: `${displayName} ${skill.name} ${skill.description || ""} ${skill.path} ${displayPath}`.trim(),
+      searchText:
+        `${displayName} ${skill.name} ${skill.description || ""} ${skill.path} ${displayPath}`.trim(),
     };
   });
 }
@@ -353,7 +385,9 @@ export function buildUnifiedSkillRows(
   sortMode: SkillSortMode = "updated",
 ): SkillModalRow[] {
   const managedRows = buildSkillRows(managedSkills, selectedSkillIds);
-  const managedPathKeys = new Set(managedRows.map((row) => normalizePathForKey(row.path)));
+  const managedPathKeys = new Set(
+    managedRows.map((row) => normalizePathForKey(row.path)),
+  );
   const externalPathKeys = new Set<string>();
 
   const externalRows: SkillModalRow[] = [];
@@ -375,14 +409,20 @@ export function buildUnifiedSkillRows(
       path: loaded.path,
       displayPath: loaded.displayPath,
       selected: selectedSkillIds.has(externalSkillId),
-      searchText: `${loaded.displayName} ${loaded.name} ${loaded.description || ""} ${loaded.path} ${loaded.displayPath}`.trim(),
+      searchText:
+        `${loaded.displayName} ${loaded.name} ${loaded.description || ""} ${loaded.path} ${loaded.displayPath}`.trim(),
     });
   }
 
-  return [...managedRows, ...externalRows].sort((a, b) => compareSkillRows(a, b, sortMode));
+  return [...managedRows, ...externalRows].sort((a, b) =>
+    compareSkillRows(a, b, sortMode),
+  );
 }
 
-export function filterSkillRows(rows: SkillModalRow[], query: string): SkillModalRow[] {
+export function filterSkillRows(
+  rows: SkillModalRow[],
+  query: string,
+): SkillModalRow[] {
   const trimmed = query.trim();
   if (!trimmed) return rows;
   return fuzzyFilter(rows, trimmed, (row) => row.searchText);
@@ -400,12 +440,18 @@ function summarizeAction(
   blocked: Array<{ skillId: string; error: string }>,
 ): string[] {
   const lines: string[] = [];
-  const changed = successes.filter((result) => result.message?.includes(actionVerb) || result.skillId);
+  const changed = successes.filter(
+    (result) => result.message?.includes(actionVerb) || result.skillId,
+  );
 
   if (actionVerb === "moved") {
-    lines.push(`Moved ${successes.length} skill${successes.length === 1 ? "" : "s"} to ${targetLabel}.`);
+    lines.push(
+      `Moved ${successes.length} skill${successes.length === 1 ? "" : "s"} to ${targetLabel}.`,
+    );
   } else if (actionVerb === "deleted") {
-    lines.push(`Deleted ${successes.length} skill${successes.length === 1 ? "" : "s"}.`);
+    lines.push(
+      `Deleted ${successes.length} skill${successes.length === 1 ? "" : "s"}.`,
+    );
   } else {
     lines.push(`${changed.length} skill action(s) completed.`);
   }
@@ -415,7 +461,9 @@ function summarizeAction(
   }
 
   if (blocked.length > 0) {
-    lines.push(`Blocked ${blocked.length} skill${blocked.length === 1 ? "" : "s"}:`);
+    lines.push(
+      `Blocked ${blocked.length} skill${blocked.length === 1 ? "" : "s"}:`,
+    );
     for (const item of blocked.slice(0, 4)) {
       lines.push(`- ${item.skillId}: ${item.error}`);
     }
@@ -429,7 +477,10 @@ function summarizeAction(
 
 type SkillMoveStore = Pick<SkillStore, "move" | "loadIndex" | "getProjectName">;
 type SkillDeleteStore = Pick<SkillStore, "delete" | "loadIndex">;
-export type ConfirmDialog = (title: string, message: string) => Promise<boolean>;
+export type ConfirmDialog = (
+  title: string,
+  message: string,
+) => Promise<boolean>;
 
 export interface SkillBatchActionResult {
   skills: SkillIndex[];
@@ -456,7 +507,9 @@ export async function moveSelectedSkills(
   if (targetScope === "project" && !store.getProjectName()) {
     return {
       skills: currentSkills,
-      summaryLines: ["Move to project is unavailable: no active project detected."],
+      summaryLines: [
+        "Move to project is unavailable: no active project detected.",
+      ],
       retainSelectedSkillIds: dedupedSkillIds,
     };
   }
@@ -475,7 +528,10 @@ export async function moveSelectedSkills(
           successes.push(result);
         }
       } else {
-        blocked.push({ skillId, error: result.error || "Unknown move failure." });
+        blocked.push({
+          skillId,
+          error: result.error || "Unknown move failure.",
+        });
       }
     } catch (error) {
       blocked.push({
@@ -486,13 +542,18 @@ export async function moveSelectedSkills(
   }
 
   const refreshedSkills = await store.loadIndex();
-  const focusSkillId = blocked[0]?.skillId
-    ?? successes[0]?.skillId
-    ?? unchanged[0]?.skillId;
+  const focusSkillId =
+    blocked[0]?.skillId ?? successes[0]?.skillId ?? unchanged[0]?.skillId;
 
   return {
     skills: refreshedSkills,
-    summaryLines: summarizeAction("moved", targetScope, successes, unchanged, blocked),
+    summaryLines: summarizeAction(
+      "moved",
+      targetScope,
+      successes,
+      unchanged,
+      blocked,
+    ),
     retainSelectedSkillIds: blocked.map((item) => item.skillId),
     focusSkillId,
   };
@@ -521,7 +582,10 @@ export async function deleteSelectedSkills(
       if (result.success) {
         successes.push(result);
       } else {
-        blocked.push({ skillId, error: result.error || "Unknown delete failure." });
+        blocked.push({
+          skillId,
+          error: result.error || "Unknown delete failure.",
+        });
       }
     } catch (error) {
       blocked.push({
@@ -548,7 +612,10 @@ export async function confirmDeleteSelectedSkills(
 ): Promise<SkillBatchActionResult> {
   const currentSkills = await store.loadIndex();
   if (skillIds.length === 0) {
-    return { skills: currentSkills, summaryLines: ["Select one or more skills first."] };
+    return {
+      skills: currentSkills,
+      summaryLines: ["Select one or more skills first."],
+    };
   }
 
   const confirmed = await confirm(
@@ -569,7 +636,10 @@ export async function confirmDeleteSelectedSkills(
 }
 
 interface SkillsManagerCallbacks {
-  moveSelected: (scope: SkillScope, skillIds: string[]) => Promise<SkillBatchActionResult>;
+  moveSelected: (
+    scope: SkillScope,
+    skillIds: string[],
+  ) => Promise<SkillBatchActionResult>;
   deleteSelected: (skillIds: string[]) => Promise<SkillBatchActionResult>;
   close: () => void;
   projectName: string | null;
@@ -615,10 +685,13 @@ export class SkillsManagerModal implements Focusable {
       loadedSkills?: LoadedSkillRow[];
     },
   ) {
-    const selectedSkillIds = new Set(initialRows.filter((row) => row.selected).map((row) => row.skillId));
+    const selectedSkillIds = new Set(
+      initialRows.filter((row) => row.selected).map((row) => row.skillId),
+    );
 
-    this.loadedSkills = options?.loadedSkills
-      ?? initialRows
+    this.loadedSkills =
+      options?.loadedSkills ??
+      initialRows
         .filter((row) => row.category === "E")
         .map((row) => ({
           name: row.name,
@@ -628,8 +701,9 @@ export class SkillsManagerModal implements Focusable {
           displayPath: row.displayPath,
         }));
 
-    this.managedSkills = options?.managedSkills
-      ?? initialRows
+    this.managedSkills =
+      options?.managedSkills ??
+      initialRows
         .filter((row) => row.category !== "E" && row.scope)
         .map((row) => ({
           skillId: row.skillId,
@@ -644,7 +718,12 @@ export class SkillsManagerModal implements Focusable {
           updated: row.updated ?? "",
         }));
 
-    this.rows = buildUnifiedSkillRows(this.managedSkills, this.loadedSkills, selectedSkillIds, this.sortMode);
+    this.rows = buildUnifiedSkillRows(
+      this.managedSkills,
+      this.loadedSkills,
+      selectedSkillIds,
+      this.sortMode,
+    );
     this.syncSearchFocus();
   }
 
@@ -653,7 +732,9 @@ export class SkillsManagerModal implements Focusable {
   }
 
   private get filteredRows(): SkillModalRow[] {
-    const categoryFiltered = this.rows.filter((row) => matchesCategoryFilter(row, this.activeFilters));
+    const categoryFiltered = this.rows.filter((row) =>
+      matchesCategoryFilter(row, this.activeFilters),
+    );
     return filterSkillRows(categoryFiltered, this.query);
   }
 
@@ -671,7 +752,10 @@ export class SkillsManagerModal implements Focusable {
     return getSelectedSkillIds(this.rows);
   }
 
-  private getFilterOptions(): Array<{ key: keyof SkillCategoryFilters; label: string }> {
+  private getFilterOptions(): Array<{
+    key: keyof SkillCategoryFilters;
+    label: string;
+  }> {
     return [
       { key: "global", label: "Global [G]" },
       { key: "project", label: "Project [P]" },
@@ -699,9 +783,18 @@ export class SkillsManagerModal implements Focusable {
     this.tui.requestRender();
   }
 
-  private setRows(managedSkills: SkillIndex[], retainSelectedSkillIds: string[] = [], focusSkillId?: string): void {
+  private setRows(
+    managedSkills: SkillIndex[],
+    retainSelectedSkillIds: string[] = [],
+    focusSkillId?: string,
+  ): void {
     this.managedSkills = managedSkills;
-    this.rows = buildUnifiedSkillRows(this.managedSkills, this.loadedSkills, new Set(retainSelectedSkillIds), this.sortMode);
+    this.rows = buildUnifiedSkillRows(
+      this.managedSkills,
+      this.loadedSkills,
+      new Set(retainSelectedSkillIds),
+      this.sortMode,
+    );
     this.syncQueryFromInput();
 
     const rows = this.filteredRows;
@@ -772,10 +865,13 @@ export class SkillsManagerModal implements Focusable {
     if (rows.length === 0) {
       this.selectedIndex = 0;
     } else if (currentRow) {
-      const focusIndex = rows.findIndex((row) => row.skillId === currentRow.skillId);
-      this.selectedIndex = focusIndex >= 0
-        ? focusIndex
-        : Math.min(this.selectedIndex, rows.length - 1);
+      const focusIndex = rows.findIndex(
+        (row) => row.skillId === currentRow.skillId,
+      );
+      this.selectedIndex =
+        focusIndex >= 0
+          ? focusIndex
+          : Math.min(this.selectedIndex, rows.length - 1);
     } else {
       this.selectedIndex = Math.min(this.selectedIndex, rows.length - 1);
     }
@@ -792,11 +888,15 @@ export class SkillsManagerModal implements Focusable {
     if (blockedExternalRows.length === 0) return result;
 
     const blockedIds = blockedExternalRows.map((row) => row.skillId);
-    const retainSet = new Set([...(result.retainSelectedSkillIds || []), ...blockedIds]);
+    const retainSet = new Set([
+      ...(result.retainSelectedSkillIds || []),
+      ...blockedIds,
+    ]);
     const focusSkillId = result.focusSkillId || blockedIds[0];
-    const blockedLabel = blockedExternalRows.length === 1
-      ? `Blocked 1 external skill: ${blockedExternalRows[0]!.displayName} is read-only.`
-      : `Blocked ${blockedExternalRows.length} external skills: read-only (${verb} unavailable).`;
+    const blockedLabel =
+      blockedExternalRows.length === 1
+        ? `Blocked 1 external skill: ${blockedExternalRows[0]!.displayName} is read-only.`
+        : `Blocked ${blockedExternalRows.length} external skills: read-only (${verb} unavailable).`;
 
     return {
       ...result,
@@ -808,7 +908,11 @@ export class SkillsManagerModal implements Focusable {
 
   private prepareMutableSelection(verb: "move" | "delete"):
     | { proceed: false }
-    | { proceed: true; mutableIds: string[]; blockedExternalRows: SkillModalRow[] } {
+    | {
+        proceed: true;
+        mutableIds: string[];
+        blockedExternalRows: SkillModalRow[];
+      } {
     const selectedRows = this.getSelectedRows();
     if (selectedRows.length === 0) {
       this.summaryLines = ["Select one or more skills first."];
@@ -838,8 +942,15 @@ export class SkillsManagerModal implements Focusable {
     const selection = this.prepareMutableSelection("move");
     if (!selection.proceed) return;
 
-    const action = this.callbacks.moveSelected(targetScope, selection.mutableIds)
-      .then((result) => this.appendExternalReadOnlySummary(result, selection.blockedExternalRows, "move"));
+    const action = this.callbacks
+      .moveSelected(targetScope, selection.mutableIds)
+      .then((result) =>
+        this.appendExternalReadOnlySummary(
+          result,
+          selection.blockedExternalRows,
+          "move",
+        ),
+      );
 
     await this.runAsyncAction(action);
   }
@@ -857,9 +968,18 @@ export class SkillsManagerModal implements Focusable {
   }
 
   private async runDeleteConfirmed(skillIds: string[]): Promise<void> {
-    const blockedExternalRows = this.rows.filter((row) => row.selected && !row.mutable);
-    const action = this.callbacks.deleteSelected(skillIds)
-      .then((result) => this.appendExternalReadOnlySummary(result, blockedExternalRows, "delete"));
+    const blockedExternalRows = this.rows.filter(
+      (row) => row.selected && !row.mutable,
+    );
+    const action = this.callbacks
+      .deleteSelected(skillIds)
+      .then((result) =>
+        this.appendExternalReadOnlySummary(
+          result,
+          blockedExternalRows,
+          "delete",
+        ),
+      );
 
     await this.runAsyncAction(action);
   }
@@ -874,16 +994,23 @@ export class SkillsManagerModal implements Focusable {
     this.pendingFilters = cloneFilters(this.activeFilters);
     this.filterCursor = 0;
     this.setFocusArea("filters");
-    this.summaryLines = ["Filter panel open: space toggle · enter apply · esc cancel."];
+    this.summaryLines = [
+      "Filter panel open: space toggle · enter apply · esc cancel.",
+    ];
     this.tui.requestRender();
   }
 
   private applyFilterPanel(): void {
-    const candidate = ensureValidFilters(this.pendingFilters ? cloneFilters(this.pendingFilters) : cloneFilters(this.activeFilters));
-    const wasAllOff = this.pendingFilters
-      && !this.pendingFilters.global
-      && !this.pendingFilters.project
-      && !this.pendingFilters.external;
+    const candidate = ensureValidFilters(
+      this.pendingFilters
+        ? cloneFilters(this.pendingFilters)
+        : cloneFilters(this.activeFilters),
+    );
+    const wasAllOff =
+      this.pendingFilters &&
+      !this.pendingFilters.global &&
+      !this.pendingFilters.project &&
+      !this.pendingFilters.external;
 
     this.activeFilters = candidate;
     this.pendingFilters = null;
@@ -936,7 +1063,9 @@ export class SkillsManagerModal implements Focusable {
     }
   }
 
-  private async runAsyncAction(action: Promise<SkillBatchActionResult>): Promise<void> {
+  private async runAsyncAction(
+    action: Promise<SkillBatchActionResult>,
+  ): Promise<void> {
     if (this.closed) return;
 
     this.busy = true;
@@ -946,11 +1075,17 @@ export class SkillsManagerModal implements Focusable {
     try {
       const result = await action;
       if (this.closed) return;
-      this.setRows(result.skills, result.retainSelectedSkillIds, result.focusSkillId);
+      this.setRows(
+        result.skills,
+        result.retainSelectedSkillIds,
+        result.focusSkillId,
+      );
       this.summaryLines = result.summaryLines;
     } catch (error) {
       if (!this.closed) {
-        this.summaryLines = [error instanceof Error ? error.message : String(error)];
+        this.summaryLines = [
+          error instanceof Error ? error.message : String(error),
+        ];
       }
     } finally {
       this.busy = false;
@@ -1099,7 +1234,10 @@ export class SkillsManagerModal implements Focusable {
       this.promptDelete();
       return;
     }
-    if (this.isPrintableInput(data) && !["g", "p", "d", "a", "n", "f", "s"].includes(data)) {
+    if (
+      this.isPrintableInput(data) &&
+      !["g", "p", "d", "a", "n", "f", "s"].includes(data)
+    ) {
       this.focusSearchWithOptionalInput(data);
     }
   }
@@ -1129,12 +1267,28 @@ export class SkillsManagerModal implements Focusable {
 
   private renderFilterPanel(width: number): string[] {
     const panelWidth = Math.max(34, Math.min(width - 10, 58));
-    const top = this.theme.fg("borderAccent", `┌${"─".repeat(Math.max(1, panelWidth - 2))}┐`);
-    const bottom = this.theme.fg("borderAccent", `└${"─".repeat(Math.max(1, panelWidth - 2))}┘`);
+    const top = this.theme.fg(
+      "borderAccent",
+      `┌${"─".repeat(Math.max(1, panelWidth - 2))}┐`,
+    );
+    const bottom = this.theme.fg(
+      "borderAccent",
+      `└${"─".repeat(Math.max(1, panelWidth - 2))}┘`,
+    );
     const lines: string[] = [top];
 
-    lines.push(this.renderFramedLine(this.theme.fg("accent", this.theme.bold("Filters")), panelWidth));
-    lines.push(this.renderFramedLine(this.theme.fg("dim", "Space toggle · Enter apply · Esc cancel"), panelWidth));
+    lines.push(
+      this.renderFramedLine(
+        this.theme.fg("accent", this.theme.bold("Filters")),
+        panelWidth,
+      ),
+    );
+    lines.push(
+      this.renderFramedLine(
+        this.theme.fg("dim", "Space toggle · Enter apply · Esc cancel"),
+        panelWidth,
+      ),
+    );
     lines.push(this.renderFramedLine("", panelWidth));
 
     const draft = this.pendingFilters ?? this.activeFilters;
@@ -1142,100 +1296,183 @@ export class SkillsManagerModal implements Focusable {
     for (let i = 0; i < options.length; i++) {
       const option = options[i]!;
       const checked = draft[option.key] ? "[x]" : "[ ]";
-      const cursor = i === this.filterCursor ? this.theme.fg("accent", "›") : " ";
+      const cursor =
+        i === this.filterCursor ? this.theme.fg("accent", "›") : " ";
       const text = `${cursor} ${checked} ${option.label}`;
-      const rendered = i === this.filterCursor
-        ? this.theme.bg("selectedBg", truncateToWidth(text, Math.max(10, panelWidth - 4), ""))
-        : truncateToWidth(text, Math.max(10, panelWidth - 4), "");
+      const rendered =
+        i === this.filterCursor
+          ? this.theme.bg(
+              "selectedBg",
+              truncateToWidth(text, Math.max(10, panelWidth - 4), ""),
+            )
+          : truncateToWidth(text, Math.max(10, panelWidth - 4), "");
       lines.push(this.renderFramedLine(rendered, panelWidth));
     }
 
     lines.push(this.renderFramedLine("", panelWidth));
-    lines.push(this.renderFramedLine(this.theme.fg("dim", `Draft: ${filtersLabel(draft)}`), panelWidth));
+    lines.push(
+      this.renderFramedLine(
+        this.theme.fg("dim", `Draft: ${filtersLabel(draft)}`),
+        panelWidth,
+      ),
+    );
     lines.push(bottom);
     return lines;
   }
 
   render(width: number): string[] {
     const safeWidth = Math.max(60, width);
-    const top = this.theme.fg("borderAccent", `┌${"─".repeat(Math.max(1, safeWidth - 2))}┐`);
-    const bottom = this.theme.fg("borderAccent", `└${"─".repeat(Math.max(1, safeWidth - 2))}┘`);
+    const top = this.theme.fg(
+      "borderAccent",
+      `┌${"─".repeat(Math.max(1, safeWidth - 2))}┐`,
+    );
+    const bottom = this.theme.fg(
+      "borderAccent",
+      `└${"─".repeat(Math.max(1, safeWidth - 2))}┘`,
+    );
     const lines: string[] = [top];
 
-    const projectName = this.callbacks.projectName ? ` · project: ${this.callbacks.projectName}` : "";
-    const title = this.theme.fg("accent", this.theme.bold(`🧠 Procedural Skills${projectName}`));
+    const projectName = this.callbacks.projectName
+      ? ` · project: ${this.callbacks.projectName}`
+      : "";
+    const title = this.theme.fg(
+      "accent",
+      this.theme.bold(`🧠 Procedural Skills${projectName}`),
+    );
     lines.push(this.renderFramedLine(title, safeWidth));
 
-    const searchHint = this.focusArea === "search"
-      ? this.theme.fg("accent", "search")
-      : this.theme.fg("dim", "search");
-    const searchLine = this.searchInput.render(Math.max(10, safeWidth - 17))[0] ?? "";
-    lines.push(this.renderFramedLine(`${searchHint}: ${searchLine}`, safeWidth));
+    const searchHint =
+      this.focusArea === "search"
+        ? this.theme.fg("accent", "search")
+        : this.theme.fg("dim", "search");
+    const searchLine =
+      this.searchInput.render(Math.max(10, safeWidth - 17))[0] ?? "";
+    lines.push(
+      this.renderFramedLine(`${searchHint}: ${searchLine}`, safeWidth),
+    );
 
     const filteredRows = this.filteredRows;
     const selectedCount = this.getSelectedIds().length;
-    lines.push(this.renderFramedLine(
-      this.theme.fg(
-        "dim",
-        `${filteredRows.length} visible · ${this.rows.length} total · ${selectedCount} selected · sort: ${sortModeLabel(this.sortMode)}${this.busy ? " · working…" : ""}`,
+    lines.push(
+      this.renderFramedLine(
+        this.theme.fg(
+          "dim",
+          `${filteredRows.length} visible · ${this.rows.length} total · ${selectedCount} selected · sort: ${sortModeLabel(this.sortMode)}${this.busy ? " · working…" : ""}`,
+        ),
+        safeWidth,
       ),
-      safeWidth,
-    ));
+    );
 
-    lines.push(this.renderFramedLine(this.theme.fg("dim", `Legend: [G] global · [P] project · [E] external (read-only) · filters: ${filtersLabel(this.activeFilters)}`), safeWidth));
+    lines.push(
+      this.renderFramedLine(
+        this.theme.fg(
+          "dim",
+          `Legend: [G] global · [P] project · [E] external (read-only) · filters: ${filtersLabel(this.activeFilters)}`,
+        ),
+        safeWidth,
+      ),
+    );
     lines.push(this.renderFramedLine("", safeWidth));
 
     if (filteredRows.length === 0) {
-      const emptyMessage = this.rows.length === 0 ? "No skills found yet." : "No skills match the current filters/search.";
-      lines.push(this.renderFramedLine(this.theme.fg("warning", emptyMessage), safeWidth));
+      const emptyMessage =
+        this.rows.length === 0
+          ? "No skills found yet."
+          : "No skills match the current filters/search.";
+      lines.push(
+        this.renderFramedLine(
+          this.theme.fg("warning", emptyMessage),
+          safeWidth,
+        ),
+      );
       lines.push(this.renderFramedLine("", safeWidth));
     } else {
       const maxVisible = this.getMaxVisibleRows();
-      const start = Math.max(0, Math.min(this.selectedIndex - Math.floor(maxVisible / 2), filteredRows.length - maxVisible));
+      const start = Math.max(
+        0,
+        Math.min(
+          this.selectedIndex - Math.floor(maxVisible / 2),
+          filteredRows.length - maxVisible,
+        ),
+      );
       const end = Math.min(filteredRows.length, start + maxVisible);
       const visibleRows = filteredRows.slice(start, end);
 
       for (let i = 0; i < visibleRows.length; i++) {
         const row = visibleRows[i]!;
         const absoluteIndex = start + i;
-        const cursor = absoluteIndex === this.selectedIndex ? this.theme.fg("accent", "›") : " ";
-        const check = row.selected ? this.theme.fg("accent", "[x]") : this.theme.fg("dim", "[ ]");
-        const category = row.category === "G"
-          ? this.theme.fg("accent", "[G]")
-          : row.category === "P"
-            ? this.theme.fg("warning", "[P]")
-            : this.theme.fg("dim", "[E]");
+        const cursor =
+          absoluteIndex === this.selectedIndex
+            ? this.theme.fg("accent", "›")
+            : " ";
+        const check = row.selected
+          ? this.theme.fg("accent", "[x]")
+          : this.theme.fg("dim", "[ ]");
+        const category =
+          row.category === "G"
+            ? this.theme.fg("accent", "[G]")
+            : row.category === "P"
+              ? this.theme.fg("warning", "[P]")
+              : this.theme.fg("dim", "[E]");
 
         const baseText = `${cursor} ${check} ${category} ${row.displayName} (${row.displayPath})`;
-        const lineText = absoluteIndex === this.selectedIndex
-          ? this.theme.bg("selectedBg", truncateToWidth(baseText, Math.max(10, safeWidth - 4), ""))
-          : truncateToWidth(baseText, Math.max(10, safeWidth - 4), "");
+        const lineText =
+          absoluteIndex === this.selectedIndex
+            ? this.theme.bg(
+                "selectedBg",
+                truncateToWidth(baseText, Math.max(10, safeWidth - 4), ""),
+              )
+            : truncateToWidth(baseText, Math.max(10, safeWidth - 4), "");
         lines.push(this.renderFramedLine(lineText, safeWidth));
       }
 
       if (start > 0 || end < filteredRows.length) {
-        lines.push(this.renderFramedLine(this.theme.fg("dim", `Showing ${start + 1}-${end} of ${filteredRows.length}`), safeWidth));
+        lines.push(
+          this.renderFramedLine(
+            this.theme.fg(
+              "dim",
+              `Showing ${start + 1}-${end} of ${filteredRows.length}`,
+            ),
+            safeWidth,
+          ),
+        );
       }
 
       lines.push(this.renderFramedLine("", safeWidth));
       const currentRow = this.getCurrentRow();
       if (currentRow) {
-        const scopeLabel = currentRow.category === "E"
-          ? "external (read-only)"
-          : currentRow.scope === "project"
-            ? "project"
-            : "global";
-        lines.push(this.renderFramedLine(this.theme.fg("accent", `Focused: ${currentRow.displayName} · ${scopeLabel}`), safeWidth));
-        lines.push(...this.renderWrappedSection([
-          currentRow.description || "(no description)",
-          this.theme.fg("dim", currentRow.skillId),
-          this.theme.fg("dim", currentRow.displayPath),
-        ], safeWidth));
+        const scopeLabel =
+          currentRow.category === "E"
+            ? "external (read-only)"
+            : currentRow.scope === "project"
+              ? "project"
+              : "global";
+        lines.push(
+          this.renderFramedLine(
+            this.theme.fg(
+              "accent",
+              `Focused: ${currentRow.displayName} · ${scopeLabel}`,
+            ),
+            safeWidth,
+          ),
+        );
+        lines.push(
+          ...this.renderWrappedSection(
+            [
+              currentRow.description || "(no description)",
+              this.theme.fg("dim", currentRow.skillId),
+              this.theme.fg("dim", currentRow.displayPath),
+            ],
+            safeWidth,
+          ),
+        );
       }
     }
 
     lines.push(this.renderFramedLine("", safeWidth));
-    lines.push(this.renderFramedLine(this.theme.fg("accent", "Last action"), safeWidth));
+    lines.push(
+      this.renderFramedLine(this.theme.fg("accent", "Last action"), safeWidth),
+    );
     lines.push(...this.renderWrappedSection(this.summaryLines, safeWidth));
     lines.push(this.renderFramedLine("", safeWidth));
 
@@ -1248,7 +1485,9 @@ export class SkillsManagerModal implements Focusable {
 
     if (this.focusArea === "filters") {
       lines.push(this.renderFramedLine("", safeWidth));
-      for (const panelLine of this.renderFilterPanel(Math.min(64, safeWidth - 6))) {
+      for (const panelLine of this.renderFilterPanel(
+        Math.min(64, safeWidth - 6),
+      )) {
         lines.push(this.renderFramedLine(panelLine, safeWidth));
       }
     }
@@ -1258,25 +1497,30 @@ export class SkillsManagerModal implements Focusable {
   }
 }
 
-export function registerSkillsCommand(pi: ExtensionAPI, store: SkillStore): void {
+export function registerSkillsCommand(
+  pi: ExtensionAPI,
+  store: SkillStore,
+): void {
   pi.registerCommand("memory-skills", {
-    description: "Manage global, active-project, and loaded external procedural skills",
+    description:
+      "Manage global, active-project, and loaded external procedural skills",
     handler: async (_args, ctx: ExtensionCommandContext) => {
       const getSkillCommands = (): SkillCommandInfo[] => {
         const readCommands = (owner: unknown): SkillCommandInfo[] | null => {
           try {
-            const getter = (owner as { getCommands?: () => unknown })?.getCommands;
+            const getter = (owner as { getCommands?: () => unknown })
+              ?.getCommands;
             if (typeof getter !== "function") return null;
             const commands = getter.call(owner);
-            return Array.isArray(commands) ? commands as SkillCommandInfo[] : [];
+            return Array.isArray(commands)
+              ? (commands as SkillCommandInfo[])
+              : [];
           } catch {
             return null;
           }
         };
 
-        return readCommands(pi)
-          ?? readCommands(ctx)
-          ?? [];
+        return readCommands(pi) ?? readCommands(ctx) ?? [];
       };
 
       const managedSkills = await store.loadIndex();
@@ -1291,21 +1535,24 @@ export function registerSkillsCommand(pi: ExtensionAPI, store: SkillStore): void
 
       try {
         await ctx.ui.custom<void>(
-          (tui, theme, _keybindings, done) => new SkillsManagerModal(
-            tui,
-            theme,
-            initialRows,
-            {
-              moveSelected: (scope, skillIds) => moveSelectedSkills(store, skillIds, scope),
-              deleteSelected: (skillIds) => deleteSelectedSkills(store, skillIds),
-              close: () => done(undefined),
-              projectName,
-            },
-            {
-              managedSkills,
-              loadedSkills,
-            },
-          ),
+          (tui, theme, _keybindings, done) =>
+            new SkillsManagerModal(
+              tui,
+              theme,
+              initialRows,
+              {
+                moveSelected: (scope, skillIds) =>
+                  moveSelectedSkills(store, skillIds, scope),
+                deleteSelected: (skillIds) =>
+                  deleteSelectedSkills(store, skillIds),
+                close: () => done(undefined),
+                projectName,
+              },
+              {
+                managedSkills,
+                loadedSkills,
+              },
+            ),
           {
             overlay: true,
             overlayOptions: {
