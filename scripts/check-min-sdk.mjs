@@ -2,12 +2,10 @@
 /**
  * Type-check the extension against the OLDEST Pi SDK we claim to support.
  *
- * Why this exists: `peerDependencies` is the only thing telling a user whether
- * this extension works on their Pi, and nothing verified it. The declared floor
- * had drifted to `>=0.74.0` while `src/handlers/review-memory-ops.ts` imports
- * `@earendil-works/pi-ai/compat`, a subpath that does not exist before 0.80.1 —
- * so anyone on 0.74-0.79.x got ERR_PACKAGE_PATH_NOT_EXPORTED and no extension
- * at all, with nothing in CI to catch it.
+ * Why this exists: Pi requires host SDK packages in `peerDependencies` to use
+ * `"*"`, so the peer range cannot state the oldest supported SDK. This extension
+ * imports `@earendil-works/pi-ai/compat`, a subpath that does not exist before
+ * 0.80.1. This check keeps that independent support floor from drifting.
  *
  * The regular `check` job structurally cannot catch this: it installs whatever
  * the devDependency range resolves to, which is always new enough.
@@ -23,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCOPE = "@earendil-works";
+const MINIMUM_SDK = "0.80.1";
 // pi-tui is a direct dependency rather than a peer, but its types cross the
 // boundary (ExtensionCommandContext.ui.custom takes a pi-tui TUI). Leaving it
 // at a different version yields a duplicate-private-property error instead of
@@ -51,21 +50,13 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => { restore(); process.exit(130); });
 }
 
-const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf-8"));
-const range = pkg.peerDependencies?.[`${SCOPE}/pi-coding-agent`];
-const floor = /(\d+\.\d+\.\d+)/.exec(range ?? "")?.[1];
-if (!floor) {
-  console.error(`peerDependencies range "${range}" has no explicit floor — pin one like ">=0.80.1"`);
-  process.exit(1);
-}
-
-console.log(`Minimum supported ${SCOPE}/pi-coding-agent: ${floor}`);
+console.log(`Minimum supported ${SCOPE}/pi-coding-agent: ${MINIMUM_SDK}`);
 
 const scratch = mkdtempSync(path.join(tmpdir(), "pi-hermes-min-sdk-"));
 let failed = false;
 try {
   writeFileSync(path.join(scratch, "package.json"), `${JSON.stringify({ name: "min-sdk-probe", private: true })}\n`);
-  const specs = FLOOR_PACKAGES.map((name) => `${name}@${floor}`);
+  const specs = FLOOR_PACKAGES.map((name) => `${name}@${MINIMUM_SDK}`);
   console.log(`Installing ${specs.join(" ")} ...`);
   execFileSync("npm", ["install", "--silent", "--no-audit", "--no-fund", "--no-package-lock", ...specs], {
     cwd: scratch,
@@ -82,13 +73,13 @@ try {
     cwd: repoRoot,
     stdio: "inherit",
   });
-  console.log(`OK — src type-checks against ${SCOPE}/pi-coding-agent@${floor}`);
+  console.log(`OK — src type-checks against ${SCOPE}/pi-coding-agent@${MINIMUM_SDK}`);
 } catch (error) {
   failed = true;
   if (!/Command failed/.test(String(error?.message))) console.error(error);
   console.error(
-    `\nsrc does NOT type-check against the declared minimum (${floor}).\n`
-    + "Either raise the peerDependencies floor in package.json to a version that works,\n"
+    `\nsrc does NOT type-check against the supported minimum (${MINIMUM_SDK}).\n`
+    + "Either raise MINIMUM_SDK to a version that works,\n"
     + "or stop using the SDK API that is missing at that version.\n",
   );
 } finally {
